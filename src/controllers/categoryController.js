@@ -1,11 +1,40 @@
 // src/controllers/categoryController.js
 const Category = require('../models/Category');
 
-// GET Category (Public)
+// Get All Categories
 const getCategories = async (req, res) => {
     try {
-        // Fetch all categories from MongoDB
-        const categories = await Category.find({});
+        const categories = await Category.aggregate([
+            {
+                // 1. The Join: Look into the 'courses' collection
+                $lookup: {
+                    from: 'courses',
+                    localField: '_id',
+                    foreignField: 'category',
+                    pipeline: [
+                        { $match: { isPublished: true } }
+                    ],
+                    as: 'publishedCourses'
+                }
+            },
+            {
+                // 2. The Math: Count the number of items in that joined array
+                $addFields: {
+                    courseCount: { $size: "$publishedCourses" }
+                }
+            },
+            {
+                // 3. The Cleanup: We only want the count, not the massive array of course data
+                $project: {
+                    publishedCourses: 0
+                }
+            },
+            {
+                // 4. The Sorting: Order them by the displayOrder the admin set!
+                $sort: { displayOrder: 1 }
+            }
+        ]);
+
         res.status(200).json(categories);
     } catch (error) {
         res.status(500).json({ message: error.message });
