@@ -34,4 +34,14 @@ const protect = async (req, res, next) => {
     }
 };
 
-module.exports = { protect };
+// Admin Middleware
+const admin = (req, res, next) => {
+    // Check if the user exists (from the protect middleware) AND is an admin
+    if (req.user && req.user.role === 'admin') {
+        next(); // Let them pass
+    } else {
+        res.status(403).json({ message: 'Access denied. Admin only.' });
+    }
+};
+
+module.exports = { protect, admin };
