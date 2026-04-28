@@ -1,25 +1,23 @@
 const Course = require('../models/Course');
 const Category = require('../models/Category');
 
-// CREATE new course
 const createCourse = async (req, res) => {
     try {
-        const { title, description, thumbnail, category, duration } = req.body;
+        const { title, description, thumbnail, category, duration, courseType } = req.body;
 
-        // Verify the category actually exists
         const categoryExists = await Category.findById(category);
         if (!categoryExists) {
             return res.status(404).json({ message: 'Category not found' });
         }
 
-        // Create the course
         const course = await Course.create({
             title,
             description,
             thumbnail,
             category,
-            instructor: req.user._id, // From protect middleware
-            duration
+            instructor: req.user._id, 
+            duration,
+            courseType
         });
 
         res.status(201).json(course);
@@ -28,17 +26,14 @@ const createCourse = async (req, res) => {
     }
 };
 
-// GET courses (Public)
 const getCourses = async (req, res) => {
     try {
         let filter = { isPublished: true };
 
-        // If a category ID is in the URL (e.g., /api/courses?category=123), filter by it
         if (req.query.category) {
             filter.category = req.query.category;
         }
 
-        // .populate() fetches the actual names instead of just the raw Object IDs
         const courses = await Course.find(filter)
             .populate('category', 'name icon')
             .populate('instructor', 'name email');
@@ -49,7 +44,18 @@ const getCourses = async (req, res) => {
     }
 };
 
-// UPDATE Course
+const getTeacherCourses = async (req, res) => {
+    try {
+        const courses = await Course.find({ instructor: req.user._id })
+            .populate('category', 'name')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(courses);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 const updateCourse = async (req, res) => {
     try {
         let course = await Course.findById(req.params.id);
@@ -58,7 +64,10 @@ const updateCourse = async (req, res) => {
             return res.status(404).json({ message: 'Course not found' });
         }
 
-        // If the update includes changing the category, verify the new category exists
+        if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized to update this course' });
+        }
+
         if (req.body.category) {
             const categoryExists = await Category.findById(req.body.category);
             if (!categoryExists) {
@@ -66,7 +75,6 @@ const updateCourse = async (req, res) => {
             }
         }
 
-        // Update the course
         course = await Course.findByIdAndUpdate(
             req.params.id,
             req.body,
@@ -79,13 +87,16 @@ const updateCourse = async (req, res) => {
     }
 };
 
-// DELETE Course
 const deleteCourse = async (req, res) => {
     try {
         const course = await Course.findById(req.params.id);
 
         if (!course) {
             return res.status(404).json({ message: 'Course not found' });
+        }
+
+        if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized to delete this course' });
         }
 
         await course.deleteOne();
@@ -99,6 +110,7 @@ const deleteCourse = async (req, res) => {
 module.exports = {
     createCourse,
     getCourses,
+    getTeacherCourses,
     updateCourse,
     deleteCourse,
 };

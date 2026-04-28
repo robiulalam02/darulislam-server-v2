@@ -1,11 +1,12 @@
 const TeacherProfile = require('../models/TeacherProfile');
 const User = require('../models/User');
+const Course = require('../models/Course');
 
 const getPendingTeachers = async (req, res) => {
     try {
         const pendingTeachers = await TeacherProfile.find({ isApproved: false })
             .populate('user', 'name email')
-            .populate('department', 'name') // NEW: Grabs the Bivag name instead of just the ID!
+            .populate('department', 'name')
             .sort({ createdAt: 1 });
 
         res.status(200).json(pendingTeachers);
@@ -83,9 +84,33 @@ const getPublicTeachers = async (req, res) => {
     }
 };
 
+const getDashboardStats = async (req, res) => {
+    try {
+        const teacherId = req.user._id;
+
+        // 1. Calculate Total Courses owned by this teacher
+        const totalCourses = await Course.countDocuments({ instructor: teacherId });
+
+        // 2. Placeholder for Total Students
+        const totalStudents = 0; 
+
+        // 3. Placeholder for New Questions
+        const newQuestions = 0;
+
+        res.status(200).json({
+            totalCourses,
+            totalStudents,
+            newQuestions
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getPendingTeachers,
     approveTeacher,
     getPublicTeachers,
     deleteTeacher,
+    getDashboardStats
 };

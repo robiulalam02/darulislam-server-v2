@@ -1,10 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { getPendingTeachers, approveTeacher, getPublicTeachers, deleteTeacher } = require('../controllers/teacherController');
-const { protect, admin } = require('../middlewares/authMiddleware');
+const { getPendingTeachers, approveTeacher, getPublicTeachers, deleteTeacher, getDashboardStats } = require('../controllers/teacherController');
+const { protect, admin, instructor } = require('../middlewares/authMiddleware');
 
 // Public Route
 router.get('/', getPublicTeachers);
+
+// Teacher Dashboard Stats
+router.get('/dashboard-stats', protect, instructor, getDashboardStats);
 
 // Protected Route (Admin)
 router.get('/pending', protect, admin, getPendingTeachers);

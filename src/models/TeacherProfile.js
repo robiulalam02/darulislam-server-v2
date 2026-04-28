@@ -8,11 +8,6 @@ const teacherProfileSchema = new mongoose.Schema(
             ref: 'User',
             unique: true
         },
-        gender: {
-            type: String,
-            enum: ['Male', 'Female', 'Other'],
-            required: [true, 'Please select a gender']
-        },
         department: {
             type: mongoose.Schema.Types.ObjectId,
             required: [true, 'Please select a department (Bivag)'],

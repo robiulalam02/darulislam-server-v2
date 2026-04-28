@@ -31,6 +31,12 @@ const courseSchema = new mongoose.Schema(
             type: String,
             default: '0 hours'
         },
+        courseType: {
+            type: String,
+            enum: ['Online', 'Offline'],
+            required: [true, 'Please specify if the course is Online or Offline'],
+            default: 'Online'
+        },
         isPublished: {
             type: Boolean,
             default: false 

@@ -44,4 +44,13 @@ const admin = (req, res, next) => {
     }
 };
 
-module.exports = { protect, admin };
+// Teacher/Instructor Middleware
+const instructor = (req, res, next) => {
+    if (req.user && (req.user.role === 'teacher' || req.user.role === 'admin')) {
+        next();
+    } else {
+        res.status(403).json({ message: 'Not authorized as an instructor' });
+    }
+};
+
+module.exports = { protect, admin, instructor };

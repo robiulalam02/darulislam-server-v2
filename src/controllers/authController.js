@@ -87,22 +87,37 @@ const loginUser = async (req, res) => {
     }
 };
 
-// get user profile (test)
-const getUserProfile = async (req, res) => {
-    if (req.user) {
-        res.json({
-            _id: req.user._id,
-            name: req.user.name,
-            email: req.user.email,
-            role: req.user.role,
+// get user profile
+const getMe = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select('-password'); // Never send the password hash back!
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        let profileData = null;
+
+        // If the user is a teacher, fetch their specific public profile data
+        if (user.role === 'teacher') {
+            profileData = await TeacherProfile.findOne({ user: user._id }).populate('department', 'name');
+        }
+
+        res.status(200).json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            role: user.role,
+            profile: profileData
         });
-    } else {
-        res.status(404).json({ message: 'User not found' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
 module.exports = {
     registerUser,
     loginUser,
-    getUserProfile,
+    getMe,
 };
