@@ -7,11 +7,10 @@ const userSchema = new mongoose.Schema(
             type: String,
             required: [true, 'Please add a name'],
             trim: true
-        },
+        },  
         gender: {
             type: String,
             enum: ['Male', 'Female', 'Other'],
-            required: [true, 'Please select a gender']
         },
         email: {
             type: String,
@@ -22,7 +21,6 @@ const userSchema = new mongoose.Schema(
         },
         phone: {
             type: String,
-            required: [true, 'Please add a phone number']
         },
         password: {
             type: String,

@@ -19,7 +19,6 @@ const teacherProfileSchema = new mongoose.Schema(
         },
         biography: {
             type: String,
-            required: [true, 'Please add a biography']
         },
         qualifications: {
             type: String

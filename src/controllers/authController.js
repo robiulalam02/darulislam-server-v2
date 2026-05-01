@@ -58,10 +58,19 @@ const registerUser = async (req, res) => {
 // Authenticate user & get token (Login)
 const loginUser = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email: identifier, password } = req.body;
 
-        // 1. Find the user
-        const user = await User.findOne({ email });
+        if (!identifier || !password) {
+            return res.status(400).json({ message: 'Please provide both an email/phone and a password' });
+        }
+
+        // 1. Find the user using the $or operator
+        const user = await User.findOne({ 
+            $or: [
+                { email: identifier },
+                { phone: identifier }
+            ]
+        });
 
         // 2. Check password (assuming you have a matchPassword method on your User schema)
         if (user && (await user.matchPassword(password))) {
@@ -80,7 +89,7 @@ const loginUser = async (req, res) => {
                 token: generateToken(user._id),
             });
         } else {
-            res.status(401).json({ message: 'Invalid email or password' });
+            res.status(401).json({ message: 'Invalid email/phone or password' });
         }
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -109,7 +118,34 @@ const getMe = async (req, res) => {
             email: user.email,
             phone: user.phone,
             role: user.role,
-            profile: profileData
+            profile: profileData,
+            createdAt: user.createdAt,
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const googleLogin = async (req, res) => {
+    try {
+        const { name, email } = req.body;
+        
+        // 1. Check if user already exists
+        let user = await User.findOne({ email });
+
+        // 2. If they don't exist, create a new student account
+        if (!user) {
+            const randomPassword = Math.random().toString(36).slice(-15) + process.env.JWT_SECRET;
+            user = await User.create({ name, email, password: randomPassword, role: 'student' });
+        }
+
+        // 3. Send back the exact same data as a normal login
+        res.status(200).json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            token: generateToken(user._id),
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -120,4 +156,5 @@ module.exports = {
     registerUser,
     loginUser,
     getMe,
+    googleLogin,
 };
