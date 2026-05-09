@@ -5,30 +5,38 @@ const createCourse = async (req, res) => {
   try {
     const {
       title,
-      description,
       category,
       duration,
       courseType,
       price,
       oldPrice,
       label,
+      // details fields
+      fullTitle,
+      courseDescription,
+      admissionFee,
+      oldAdmissionFee,
+      monthlyFee,
+      discount,
+      coupon,
+      batchInfo,
+      highlights,
     } = req.body;
 
-    // Ensure category exists
-    // const categoryExists = await Category.findById(category);
-    // if (!categoryExists) {
-    //   return res.status(404).json({ message: "Category not found" });
-    // }
-
-    // Handle Image Upload (Cloudinary via Multer middleware)
+    // Handle Image Upload
     const thumbnail = req.file ? req.file.path : null;
     if (!thumbnail) {
       return res.status(400).json({ message: "Course thumbnail is required" });
     }
 
+    let parsedHighlights = [];
+    if (highlights) {
+      parsedHighlights =
+        typeof highlights === "string" ? JSON.parse(highlights) : highlights;
+    }
+
     const course = await Course.create({
       title,
-      description,
       thumbnail,
       category,
       instructor: req.user._id,
@@ -37,6 +45,17 @@ const createCourse = async (req, res) => {
       price: price || 0,
       oldPrice: oldPrice || 0,
       label: label || "",
+      details: {
+        fullTitle: fullTitle || title,
+        description: courseDescription || description,
+        admissionFee: admissionFee || 0,
+        oldAdmissionFee: oldAdmissionFee || 0,
+        monthlyFee: monthlyFee || 0,
+        discount: discount || 0,
+        coupon: coupon || "",
+        batchInfo: batchInfo || "",
+        highlights: parsedHighlights,
+      },
     });
 
     res.status(201).json(course);
@@ -65,19 +84,18 @@ const getCourses = async (req, res) => {
 
 const getEducationPageData = async (req, res) => {
   try {
-    // 1. Fetch the categories from published courses
     const distinctCategories = await Course.distinct("category", {
       isPublished: true,
     });
 
-    // 2. Make group for each category
+    // ২. প্রতিটি ক্যাটাগরির জন্য কোর্সগুলো গ্রুপ করা
     const groupedData = await Promise.all(
       distinctCategories.map(async (catName) => {
         const courses = await Course.find({
           category: catName,
           isPublished: true,
         })
-          .select("title thumbnail price oldPrice label")
+          .select("title thumbnail price oldPrice label details")
           .limit(8);
 
         return {
@@ -90,12 +108,12 @@ const getEducationPageData = async (req, res) => {
             oldPrice: c.oldPrice,
             label: c.label,
             image: c.thumbnail,
+            details: c.details || {},
           })),
         };
       }),
     );
 
-    // 3. If any category is empty
     const filteredData = groupedData.filter(
       (group) => group.courses.length > 0,
     );

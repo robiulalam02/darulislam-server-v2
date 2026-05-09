@@ -1,50 +1,70 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const courseSchema = new mongoose.Schema(
-    {
-        title: {
-            type: String,
-            required: [true, 'Please add a course title'],
-            trim: true
-        },
-        description: {
-            type: String,
-            required: [true, 'Please add a description']
-        },
-        thumbnail: {
-            type: String,
-            required: [true, 'Please add a thumbnail image URL']
-        },
-        // THE RELATIONAL LINK TO CATEGORY
-        category: {
-            // type: mongoose.Schema.Types.ObjectId,
-            type: String,
-            required: true,
-            ref: 'Category' 
-        },
-        // THE RELATIONAL LINK TO INSTRUCTOR
-        instructor: {
-            type: mongoose.Schema.Types.ObjectId,
-            required: true,
-            ref: 'User'
-        },
-        duration: {
-            type: String,
-            default: '0 hours'
-        },
-        courseType: {
-            type: String,
-            required: [true, 'Please specify if the course is Online or Offline'],
-            default: 'Online'
-        },
-        isPublished: {
-            type: Boolean,
-            default: false 
-        }
+  {
+    title: {
+      type: String,
+      required: [true, "Please add a course title"],
+      trim: true,
     },
-    {
-        timestamps: true
-    }
+    thumbnail: {
+      type: String,
+      required: [true, "Please add a thumbnail image URL"],
+    },
+    category: {
+      type: String,
+      required: true,
+    },
+    instructor: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: "User",
+    },
+    price: {
+      type: Number,
+      default: 0,
+    },
+    oldPrice: {
+      type: Number,
+      default: 0,
+    },
+    label: {
+      type: String,
+      default: "",
+    },
+    duration: {
+      type: String,
+      default: "0 hours",
+    },
+    courseType: {
+      type: String,
+      required: [true, "Please specify course type"],
+      default: "Online",
+    },
+    isPublished: {
+      type: Boolean,
+      default: true,
+    },
+    details: {
+      fullTitle: { type: String },
+      description: { type: String },
+      admissionFee: { type: Number, default: 0 },
+      oldAdmissionFee: { type: Number, default: 0 },
+      monthlyFee: { type: Number, default: 0 },
+      discount: { type: Number, default: 0 },
+      coupon: { type: String },
+      batchInfo: { type: String },
+      highlights: [
+        {
+          label: { type: String },
+          value: { type: String },
+        },
+      ],
+    },
+  },
+  {
+    timestamps: true,
+  },
 );
 
-module.exports = mongoose.model('Course', courseSchema);
+module.exports = mongoose.model("Course", courseSchema);
