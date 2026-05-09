@@ -7,7 +7,7 @@ const courseSchema = new mongoose.Schema(
       required: [true, "Please add a course title"],
       trim: true,
     },
-    thumbnail: {
+    image: {
       type: String,
       required: [true, "Please add a thumbnail image URL"],
     },

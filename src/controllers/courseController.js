@@ -95,7 +95,7 @@ const getEducationPageData = async (req, res) => {
           category: catName,
           isPublished: true,
         })
-          .select("title thumbnail price oldPrice label details")
+          .select("title image price oldPrice label details")
           .limit(8);
 
         return {
@@ -107,7 +107,7 @@ const getEducationPageData = async (req, res) => {
             price: c.price,
             oldPrice: c.oldPrice,
             label: c.label,
-            image: c.thumbnail,
+            image: c.image,
             details: c.details || {},
           })),
         };
