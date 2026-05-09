@@ -17,7 +17,8 @@ const courseSchema = new mongoose.Schema(
         },
         // THE RELATIONAL LINK TO CATEGORY
         category: {
-            type: mongoose.Schema.Types.ObjectId,
+            // type: mongoose.Schema.Types.ObjectId,
+            type: String,
             required: true,
             ref: 'Category' 
         },
@@ -33,7 +34,6 @@ const courseSchema = new mongoose.Schema(
         },
         courseType: {
             type: String,
-            enum: ['Online', 'Offline'],
             required: [true, 'Please specify if the course is Online or Offline'],
             default: 'Online'
         },

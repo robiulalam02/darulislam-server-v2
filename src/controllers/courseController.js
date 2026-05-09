@@ -1,116 +1,192 @@
-const Course = require('../models/Course');
-const Category = require('../models/Category');
+const Course = require("../models/Course");
+const Category = require("../models/Category");
 
 const createCourse = async (req, res) => {
-    try {
-        const { title, description, thumbnail, category, duration, courseType } = req.body;
+  try {
+    const {
+      title,
+      description,
+      category,
+      duration,
+      courseType,
+      price,
+      oldPrice,
+      label,
+    } = req.body;
 
-        const categoryExists = await Category.findById(category);
-        if (!categoryExists) {
-            return res.status(404).json({ message: 'Category not found' });
-        }
+    // Ensure category exists
+    // const categoryExists = await Category.findById(category);
+    // if (!categoryExists) {
+    //   return res.status(404).json({ message: "Category not found" });
+    // }
 
-        const course = await Course.create({
-            title,
-            description,
-            thumbnail,
-            category,
-            instructor: req.user._id, 
-            duration,
-            courseType
-        });
-
-        res.status(201).json(course);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    // Handle Image Upload (Cloudinary via Multer middleware)
+    const thumbnail = req.file ? req.file.path : null;
+    if (!thumbnail) {
+      return res.status(400).json({ message: "Course thumbnail is required" });
     }
+
+    const course = await Course.create({
+      title,
+      description,
+      thumbnail,
+      category,
+      instructor: req.user._id,
+      duration,
+      courseType,
+      price: price || 0,
+      oldPrice: oldPrice || 0,
+      label: label || "",
+    });
+
+    res.status(201).json(course);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 const getCourses = async (req, res) => {
-    try {
-        let filter = { isPublished: true };
+  try {
+    let filter = { isPublished: true };
 
-        if (req.query.category) {
-            filter.category = req.query.category;
-        }
-
-        const courses = await Course.find(filter)
-            .populate('category', 'name icon')
-            .populate('instructor', 'name email');
-
-        res.status(200).json(courses);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (req.query.category) {
+      filter.category = req.query.category;
     }
+
+    const courses = await Course.find(filter)
+      .populate("category", "name icon")
+      .populate("instructor", "name email");
+
+    res.status(200).json(courses);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getEducationPageData = async (req, res) => {
+  try {
+    // 1. Fetch the categories from published courses
+    const distinctCategories = await Course.distinct("category", {
+      isPublished: true,
+    });
+
+    // 2. Make group for each category
+    const groupedData = await Promise.all(
+      distinctCategories.map(async (catName) => {
+        const courses = await Course.find({
+          category: catName,
+          isPublished: true,
+        })
+          .select("title thumbnail price oldPrice label")
+          .limit(8);
+
+        return {
+          category: catName,
+          type: "card",
+          courses: courses.map((c) => ({
+            id: c._id,
+            title: c.title,
+            price: c.price,
+            oldPrice: c.oldPrice,
+            label: c.label,
+            image: c.thumbnail,
+          })),
+        };
+      }),
+    );
+
+    // 3. If any category is empty
+    const filteredData = groupedData.filter(
+      (group) => group.courses.length > 0,
+    );
+
+    res.status(200).json(filteredData);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 const getTeacherCourses = async (req, res) => {
-    try {
-        const courses = await Course.find({ instructor: req.user._id })
-            .populate('category', 'name')
-            .sort({ createdAt: -1 });
+  try {
+    const courses = await Course.find({ instructor: req.user._id })
+      .populate("category", "name")
+      .sort({ createdAt: -1 });
 
-        res.status(200).json(courses);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+    res.status(200).json(courses);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 const updateCourse = async (req, res) => {
-    try {
-        let course = await Course.findById(req.params.id);
+  try {
+    let course = await Course.findById(req.params.id);
 
-        if (!course) {
-            return res.status(404).json({ message: 'Course not found' });
-        }
-
-        if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-            return res.status(403).json({ message: 'Not authorized to update this course' });
-        }
-
-        if (req.body.category) {
-            const categoryExists = await Category.findById(req.body.category);
-            if (!categoryExists) {
-                return res.status(404).json({ message: 'The new category provided does not exist' });
-            }
-        }
-
-        course = await Course.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true, runValidators: true }
-        );
-
-        res.status(200).json(course);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
     }
+
+    if (
+      course.instructor.toString() !== req.user._id.toString() &&
+      req.user.role !== "admin"
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to update this course" });
+    }
+
+    if (req.body.category) {
+      const categoryExists = await Category.findById(req.body.category);
+      if (!categoryExists) {
+        return res
+          .status(404)
+          .json({ message: "The new category provided does not exist" });
+      }
+    }
+
+    course = await Course.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    res.status(200).json(course);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 const deleteCourse = async (req, res) => {
-    try {
-        const course = await Course.findById(req.params.id);
+  try {
+    const course = await Course.findById(req.params.id);
 
-        if (!course) {
-            return res.status(404).json({ message: 'Course not found' });
-        }
-
-        if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-            return res.status(403).json({ message: 'Not authorized to delete this course' });
-        }
-
-        await course.deleteOne();
-
-        res.status(200).json({ id: req.params.id, message: 'Course removed successfully' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
     }
+
+    if (
+      course.instructor.toString() !== req.user._id.toString() &&
+      req.user.role !== "admin"
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to delete this course" });
+    }
+
+    await course.deleteOne();
+
+    res
+      .status(200)
+      .json({ id: req.params.id, message: "Course removed successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 module.exports = {
-    createCourse,
-    getCourses,
-    getTeacherCourses,
-    updateCourse,
-    deleteCourse,
+  createCourse,
+  getCourses,
+  getTeacherCourses,
+  updateCourse,
+  deleteCourse,
+  getEducationPageData,
 };
