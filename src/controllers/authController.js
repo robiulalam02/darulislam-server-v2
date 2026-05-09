@@ -4,84 +4,46 @@ const TeacherProfile = require("../models/TeacherProfile");
 
 const registerUser = async (req, res) => {
   try {
-    const {
-      studentNameBn,
-      studentNameEn,
-      email,
-      birthDate,
-      gender,
-      division,
-      classLevel,
-      fatherName,
-      fatherMobile,
-      fatherJob,
-      motherName,
-      motherMobile,
-      motherJob,
-      presentDivision,
-      district,
-      permanentAddress,
-      studentMobile,
-      password,
-    } = req.body;
+    const { email, studentMobile, password, role, ...rest } = req.body;
 
-    const phone = studentMobile;
-    const name = studentNameEn;
-
-    // 1. Validate required fields
-    if (!phone || !password || !name || !email) {
-      return res
-        .status(400)
-        .json({ message: "Name, email, phone, and password are required" });
-    }
-
-    // 2. Check if user already exists (by email OR phone)
     const userExists = await User.findOne({
-      $or: [{ email }, { phone }],
+      $or: [{ email }, { phone: studentMobile }],
     });
 
     if (userExists) {
       return res
         .status(400)
-        .json({
-          message: "User with this email or mobile number already exists",
-        });
+        .json({ message: "ব্যবহারকারী ইতিমধ্যে বিদ্যমান (User exists)" });
     }
 
-    // 3. Handle Cloudinary Image (if uploaded)
     const profileImage = req.file ? req.file.path : null;
 
-    // 4. Create User
+    // 1. Create Base User
     const user = await User.create({
-      name,
-      studentNameBn,
+      ...rest,
+      name: req.body.studentNameEn,
+      phone: studentMobile,
       email,
-      phone,
       password,
-      gender,
+      role: role || "student",
       profileImage,
-      birthDate,
-      division,
-      classLevel,
-      fatherName,
-      fatherMobile,
-      fatherJob,
-      motherName,
-      motherMobile,
-      motherJob,
-      presentDivision,
-      district,
-      permanentAddress,
     });
 
-    // 5. Send Success Response
+    // 2. Create Teacher Profile if applicable
+    if (user.role === "teacher") {
+      await TeacherProfile.create({
+        user: user._id,
+        department: req.body.department, // Passed from Step 2 for teachers
+        designation: req.body.designation,
+        qualifications: req.body.qualifications,
+      });
+    }
+
     res.status(201).json({
       _id: user._id,
       name: user.name,
-      email: user.email,
-      phone: user.phone,
       role: user.role,
-      profileImage: user.profileImage,
+      token: generateToken(user._id),
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
