@@ -14,7 +14,7 @@ const upload = require('../middlewares/uploadMiddleware');
 // Public route to get courses
 router.get("/", getCourses);
 
-// Get courses y categories for education page
+// Get courses by categories for education page
 router.get("/education", getEducationPageData);
 
 // Dashboard Route (MUST BE ABOVE /:id)

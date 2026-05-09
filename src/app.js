@@ -5,6 +5,7 @@ const categoryRoutes = require("./routes/categoryRoutes");
 const courseRoutes = require("./routes/courseRoutes");
 const testimonialRoutes = require("./routes/testimonialRoutes");
 const teacherRoutes = require("./routes/teacherRoutes");
+const productRoutes = require("./routes/productRoutes");
 const cors = require("cors");
 
 const app = express();
@@ -41,6 +42,7 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/testimonials", testimonialRoutes);
 app.use("/api/teachers", teacherRoutes);
+app.use("/api/products", productRoutes);
 
 app.get("/", (req, res) => {
   res.send("Darul Islam server is running...");
