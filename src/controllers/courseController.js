@@ -84,19 +84,24 @@ const getCourses = async (req, res) => {
 
 const getEducationPageData = async (req, res) => {
   try {
-    const distinctCategories = await Course.distinct("category", {
-      isPublished: true,
-    });
+    // List of categories we want to show
+    const fixedCategories = [
+      "একাডেমিক কোর্স সমূহ",
+      "বান্ডেল কোর্স সমূহ",
+      "দরসি কিতাব কোর্স সমূহ",
+      "প্রিমিয়াম কোর্স সমূহ",
+    ];
 
-    // ২. প্রতিটি ক্যাটাগরির জন্য কোর্সগুলো গ্রুপ করা
+    // fetch data for each category
     const groupedData = await Promise.all(
-      distinctCategories.map(async (catName) => {
+      fixedCategories.map(async (catName) => {
         const courses = await Course.find({
           category: catName,
           isPublished: true,
         })
           .select("title image price oldPrice label details")
-          .limit(8);
+          .sort({ createdAt: -1 }) // show new courses first
+          .limit(10); // Limit 10 courses per category
 
         return {
           category: catName,
@@ -114,6 +119,7 @@ const getEducationPageData = async (req, res) => {
       }),
     );
 
+    // Filter Categories which has atleast one course
     const filteredData = groupedData.filter(
       (group) => group.courses.length > 0,
     );
