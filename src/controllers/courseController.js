@@ -37,7 +37,7 @@ const createCourse = async (req, res) => {
 
     const course = await Course.create({
       title,
-      thumbnail,
+      image: thumbnail,
       category,
       instructor: req.user._id,
       duration,
@@ -47,7 +47,7 @@ const createCourse = async (req, res) => {
       label: label || "",
       details: {
         fullTitle: fullTitle || title,
-        description: courseDescription || description,
+        description: courseDescription,
         admissionFee: admissionFee || 0,
         oldAdmissionFee: oldAdmissionFee || 0,
         monthlyFee: monthlyFee || 0,
@@ -126,9 +126,9 @@ const getEducationPageData = async (req, res) => {
 
 const getTeacherCourses = async (req, res) => {
   try {
-    const courses = await Course.find({ instructor: req.user._id })
-      .populate("category", "name")
-      .sort({ createdAt: -1 });
+    const courses = await Course.find({ instructor: req.user._id }).sort({
+      createdAt: -1,
+    });
 
     res.status(200).json(courses);
   } catch (error) {
@@ -138,36 +138,45 @@ const getTeacherCourses = async (req, res) => {
 
 const updateCourse = async (req, res) => {
   try {
-    let course = await Course.findById(req.params.id);
+    const course = await Course.findById(req.params.id);
+    if (!course) return res.status(404).json({ message: "Course not found" });
 
-    if (!course) {
-      return res.status(404).json({ message: "Course not found" });
+    // 1. Handle Root Level Data
+    const { highlights, ...restOfBody } = req.body;
+    let updateData = { ...restOfBody };
+
+    if (req.file) {
+      updateData.image = req.file.path; // New image from Couldinary
     }
 
+    // Handle Nested Details Data
     if (
-      course.instructor.toString() !== req.user._id.toString() &&
-      req.user.role !== "admin"
+      req.body.fullTitle ||
+      req.body.description ||
+      req.body.admissionFee ||
+      highlights
     ) {
-      return res
-        .status(403)
-        .json({ message: "Not authorized to update this course" });
+      updateData.details = {
+        ...course.details,
+        fullTitle: req.body.fullTitle || course.details.fullTitle,
+        description: req.body.description || course.details.description,
+        admissionFee: req.body.admissionFee || course.details.admissionFee,
+        highlights: highlights
+          ? typeof highlights === "string"
+            ? JSON.parse(highlights)
+            : highlights
+          : course.details.highlights,
+      };
     }
 
-    if (req.body.category) {
-      const categoryExists = await Category.findById(req.body.category);
-      if (!categoryExists) {
-        return res
-          .status(404)
-          .json({ message: "The new category provided does not exist" });
-      }
-    }
+    // Final Update
+    const updatedCourse = await Course.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateData },
+      { new: true, runValidators: true },
+    );
 
-    course = await Course.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
-
-    res.status(200).json(course);
+    res.status(200).json(updatedCourse);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -18,11 +18,11 @@ router.get("/", getCourses);
 router.get("/education", getEducationPageData);
 
 // Dashboard Route (MUST BE ABOVE /:id)
-router.get("/my-courses", protect, instructor, getTeacherCourses);
+router.get("/teacher/my-courses", protect, instructor, getTeacherCourses);
 
 // CRUD Routes for Instructors
-router.post("/", protect, instructor, upload.single('thumbnail'), createCourse);
-router.put("/:id", protect, instructor, updateCourse);
+router.post("/teacher/add-course", protect, instructor, upload.single('image'), createCourse);
+router.put("/teacher/:id", protect, instructor, upload.single('image'), updateCourse);
 router.delete("/:id", protect, instructor, deleteCourse);
 
 module.exports = router;
