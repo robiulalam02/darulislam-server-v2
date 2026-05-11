@@ -3,8 +3,7 @@ const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true },
-    studentNameBn: { type: String, trim: true },
+    name: { type: String, required: true, trim: true }, // English Name
     email: {
       type: String,
       required: true,
@@ -20,20 +19,9 @@ const userSchema = new mongoose.Schema(
       default: "student",
     },
     profileImage: { type: String },
-
     birthDate: { type: String },
     gender: { type: String, enum: ["male", "female"] },
     division: { type: String },
-    classLevel: { type: String },
-
-    fatherName: { type: String },
-    fatherMobile: { type: String },
-    fatherJob: { type: String },
-
-    motherName: { type: String },
-    motherMobile: { type: String },
-    motherJob: { type: String },
-
     presentDivision: { type: String },
     district: { type: String },
     permanentAddress: { type: String },

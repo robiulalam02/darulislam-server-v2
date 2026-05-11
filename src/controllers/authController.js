@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
+const StudentProfile = require("../models/StudentProfile");
 const TeacherProfile = require("../models/TeacherProfile");
 
 const registerUser = async (req, res) => {
@@ -9,31 +10,48 @@ const registerUser = async (req, res) => {
     const userExists = await User.findOne({
       $or: [{ email }, { phone: studentMobile }],
     });
-
-    if (userExists) {
-      return res
-        .status(400)
-        .json({ message: "ব্যবহারকারী ইতিমধ্যে বিদ্যমান (User exists)" });
-    }
+    if (userExists)
+      return res.status(400).json({ message: "ব্যবহারকারী ইতিমধ্যে বিদ্যমান" });
 
     const profileImage = req.file ? req.file.path : null;
 
-    // 1. Create Base User
+    // 1. mian user common data
     const user = await User.create({
-      ...rest,
       name: req.body.studentNameEn,
       phone: studentMobile,
       email,
       password,
       role: role || "student",
       profileImage,
+      birthDate: req.body.birthDate,
+      gender: req.body.gender,
+      division: req.body.division,
+      presentDivision: req.body.presentDivision,
+      district: req.body.district,
+      permanentAddress: req.body.permanentAddress,
     });
 
-    // 2. Create Teacher Profile if applicable
+    // make student profile if registering as student
+    if (user.role === "student") {
+      await StudentProfile.create({
+        user: user._id,
+        studentNameBn: req.body.studentNameBn,
+        classLevel: req.body.classLevel,
+        fatherName: req.body.fatherName,
+        fatherMobile: req.body.fatherMobile,
+        fatherJob: req.body.fatherJob,
+        motherName: req.body.motherName,
+        motherMobile: req.body.motherMobile,
+        motherJob: req.body.motherJob,
+      });
+    }
+
+    // 3. If Teacher, then make teacher profile
     if (user.role === "teacher") {
       await TeacherProfile.create({
         user: user._id,
-        department: req.body.department, // Passed from Step 2 for teachers
+        teacherNameBn: req.body.teacherNameBn,
+        department: req.body.department,
         designation: req.body.designation,
         qualifications: req.body.qualifications,
       });
@@ -61,17 +79,25 @@ const loginUser = async (req, res) => {
         .json({ message: "Please provide both an email/phone and a password" });
     }
 
-    // 1. Find the user using the $or operator
+    // 1. Find user by email or phone
     const user = await User.findOne({
       $or: [{ email: identifier }, { phone: identifier }],
     });
 
-    // 2. Check password (assuming you have a matchPassword method on your User schema)
+    // 2. check password
     if (user && (await user.matchPassword(password))) {
-      // 3. Look for a Teacher Profile linked to this user
-      const teacherProfile = await TeacherProfile.findOne({
-        user: user._id,
-      }).populate("department", "name");
+      let profileData = null;
+
+      // fetch right profile according to role
+      if (user.role === "teacher") {
+        profileData = await TeacherProfile.findOne({
+          user: user._id,
+        }).populate("department", "name");
+      } else if (user.role === "student") {
+        profileData = await StudentProfile.findOne({
+          user: user._id,
+        });
+      }
 
       res.status(200).json({
         _id: user._id,
@@ -80,7 +106,7 @@ const loginUser = async (req, res) => {
         phone: user.phone,
         gender: user.gender,
         role: user.role,
-        profile: teacherProfile || null,
+        profile: profileData || null, // profile of teacher or student
         token: generateToken(user._id),
       });
     } else {
@@ -94,31 +120,21 @@ const loginUser = async (req, res) => {
 // get user profile
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("-password"); // Never send the password hash back!
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    const user = await User.findById(req.user._id).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     let profileData = null;
 
-    // If the user is a teacher, fetch their specific public profile data
     if (user.role === "teacher") {
       profileData = await TeacherProfile.findOne({ user: user._id }).populate(
         "department",
         "name",
       );
+    } else if (user.role === "student") {
+      profileData = await StudentProfile.findOne({ user: user._id });
     }
 
-    res.status(200).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      profile: profileData,
-      createdAt: user.createdAt,
-    });
+    res.status(200).json({ ...user._doc, profile: profileData });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

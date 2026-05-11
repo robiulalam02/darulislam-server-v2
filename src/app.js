@@ -6,6 +6,7 @@ const courseRoutes = require("./routes/courseRoutes");
 const testimonialRoutes = require("./routes/testimonialRoutes");
 const teacherRoutes = require("./routes/teacherRoutes");
 const productRoutes = require("./routes/productRoutes");
+const userRoutes = require("./routes/userRoutes");
 const cors = require("cors");
 
 const app = express();
@@ -41,6 +42,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/testimonials", testimonialRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/teachers", teacherRoutes);
 app.use("/api/products", productRoutes);
 
