@@ -144,27 +144,43 @@ const googleLogin = async (req, res) => {
   try {
     const { name, email } = req.body;
 
-    // 1. Check if user already exists
     let user = await User.findOne({ email });
 
-    // 2. If they don't exist, create a new student account
+    // 1. If user not exist then create new user and student profile
     if (!user) {
       const randomPassword =
         Math.random().toString(36).slice(-15) + process.env.JWT_SECRET;
+
       user = await User.create({
         name,
         email,
+        phone: `G-${Date.now()}`,
         password: randomPassword,
         role: "student",
       });
+
+      // make student profile for google user
+      await StudentProfile.create({
+        user: user._id,
+        studentNameBn: "",
+      });
     }
 
-    // 3. Send back the exact same data as a normal login
+    // 2. Send response data after successful login/register
+    let profileData = await StudentProfile.findOne({ user: user._id });
+    if (!profileData && user.role === "teacher") {
+      profileData = await TeacherProfile.findOne({ user: user._id }).populate(
+        "department",
+        "name",
+      );
+    }
+
     res.status(200).json({
       _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
+      profile: profileData || null,
       token: generateToken(user._id),
     });
   } catch (error) {
