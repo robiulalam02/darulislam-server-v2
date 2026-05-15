@@ -117,6 +117,59 @@ const loginUser = async (req, res) => {
   }
 };
 
+// Update User Profile
+const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { password, role, profileData, ...userUpdates } = req.body;
+
+    // Main user data
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "ইউজার পাওয়া যায়নি" });
+
+    if (req.file) {
+      userUpdates.profileImage = req.file.path;
+    }
+
+    // Dynamic field update
+    Object.keys(userUpdates).forEach((key) => {
+      user[key] = userUpdates[key];
+    });
+
+    await user.save();
+
+    // Profile update based on user Role
+    let parsedProfileData =
+      typeof profileData === "string" ? JSON.parse(profileData) : profileData;
+    let updatedProfile = null;
+
+    if (user.role === "student") {
+      updatedProfile = await StudentProfile.findOneAndUpdate(
+        { user: userId },
+        { $set: parsedProfileData },
+        { new: true, runValidators: true },
+      );
+    } else if (user.role === "teacher") {
+      updatedProfile = await TeacherProfile.findOneAndUpdate(
+        { user: userId },
+        { $set: parsedProfileData },
+        { new: true, runValidators: true },
+      ).populate("department", "name");
+    }
+
+    res.status(200).json({
+      message: "প্রোফাইল সফলভাবে আপডেট হয়েছে",
+      user: {
+        ...user._doc,
+        password: "",
+        profile: updatedProfile,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // get user profile
 const getMe = async (req, res) => {
   try {
@@ -193,4 +246,5 @@ module.exports = {
   loginUser,
   getMe,
   googleLogin,
+  updateProfile,
 };

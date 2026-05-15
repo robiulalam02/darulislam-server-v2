@@ -6,6 +6,7 @@ const {
   loginUser,
   getMe,
   googleLogin,
+  updateProfile,
 } = require("../controllers/authController");
 
 // Import middleware
@@ -16,5 +17,12 @@ router.post("/register", upload.single("profileImage"), registerUser);
 router.post("/login", loginUser);
 router.post("/google", googleLogin);
 router.get("/me", protect, getMe);
+
+router.put(
+  "/update-profile",
+  protect,
+  upload.single("profileImage"),
+  updateProfile,
+);
 
 module.exports = router;
