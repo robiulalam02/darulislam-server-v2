@@ -2,6 +2,8 @@ const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 const StudentProfile = require("../models/StudentProfile");
 const TeacherProfile = require("../models/TeacherProfile");
+const Notice = require("../models/Notice");
+const ClassLink = require("../models/ClassLink");
 
 const registerUser = async (req, res) => {
   try {
@@ -173,21 +175,49 @@ const updateProfile = async (req, res) => {
 // get user profile
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("-password");
+    const userId = req.user._id;
+
+    // 1. Fetch primary user data instantly
+    const user = await User.findById(userId).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
 
     let profileData = null;
+    let extraData = {};
 
+    // 2. Process architecture based on role
     if (user.role === "teacher") {
-      profileData = await TeacherProfile.findOne({ user: user._id }).populate(
+      profileData = await TeacherProfile.findOne({ user: userId }).populate(
         "department",
         "name",
       );
     } else if (user.role === "student") {
-      profileData = await StudentProfile.findOne({ user: user._id });
+      const [studentProfile, noticesFeed, classLinksFeed] = await Promise.all([
+        StudentProfile.findOne({ user: userId }),
+
+        Notice.find({})
+          .populate("course", "name category banner")
+          .populate("instructor", "name profilePicture")
+          .sort({ pinned: -1, createdAt: -1 }),
+
+        ClassLink.find({})
+          .populate("course", "title category image")
+          .populate("instructor", "name profilePicture")
+          .sort({ classDate: 1, startTime: 1 }),
+      ]);
+
+      profileData = studentProfile;
+      extraData = {
+        notices: noticesFeed,
+        classLinks: classLinksFeed,
+      };
     }
 
-    res.status(200).json({ ...user._doc, profile: profileData });
+    // 3. Destructure and combine everything inside a single unified payload object
+    res.status(200).json({
+      ...user._doc,
+      profile: profileData,
+      ...extraData,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
