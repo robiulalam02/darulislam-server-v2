@@ -4,6 +4,7 @@ const {
   createClassLink,
   getClassLinks,
   updateClassLink,
+  getStudentClassLinks,
   deleteClassLink,
 } = require("../controllers/classLinkController");
 const { protect, instructor } = require("../middlewares/authMiddleware");
@@ -16,5 +17,8 @@ router.put("/teacher/update-link/:id", protect, instructor, updateClassLink);
 
 // DELETE Class Link
 router.delete("/teacher/delete-link/:id", protect, instructor, deleteClassLink);
+
+// --- Student Routes ---
+router.get("/student/my-links", protect, getStudentClassLinks);
 
 module.exports = router;

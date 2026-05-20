@@ -88,6 +88,32 @@ const updateClassLink = async (req, res) => {
   }
 };
 
+const getStudentClassLinks = async (req, res) => {
+  try {
+    const { courseIds } = req.query;
+    const queryFilter = {};
+
+    if (courseIds) {
+      // Split the comma-separated string from URL into an array of ObjectIds
+      const targetCourseIds = courseIds.split(",").map((id) => id.trim());
+      queryFilter.course = { $in: targetCourseIds };
+    }
+
+    // MongoDB automatically hides expired documents if TTL index is active
+    const links = await ClassLink.find(queryFilter)
+      .populate("course", "title category image")
+      .populate("instructor", "name profilePicture") // Fetching teacher details for frontend UI card
+      .sort({ classDate: 1, startTime: 1 }); // Chronological order: closest class shows first
+
+    res.status(200).json({
+      totalCount: links.length,
+      data: links,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Delete Class Link Manually
 const deleteClassLink = async (req, res) => {
   try {
@@ -115,5 +141,6 @@ module.exports = {
   createClassLink,
   getClassLinks,
   updateClassLink,
+  getStudentClassLinks,
   deleteClassLink,
 };
