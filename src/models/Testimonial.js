@@ -20,7 +20,7 @@ const testimonialSchema = new mongoose.Schema(
         },
         isApproved: {
             type: Boolean,
-            default: false // Strictly false by default for the approval flow
+            default: false
         }
     },
     {

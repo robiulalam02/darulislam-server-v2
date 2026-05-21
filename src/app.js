@@ -11,6 +11,7 @@ const classLinkRoutes = require("./routes/classLinkRoutes");
 const assignmentRoutes = require("./routes/assignmentRoutes");
 const adminNoticeRoutes = require("./routes/adminNoticeRoutes");
 const teacherNoticeRoutes = require("./routes/teacherNoticeRoutes");
+const galleryRoutes = require("./routes/galleryRoutes");
 const cors = require("cors");
 
 const app = express();
@@ -53,6 +54,7 @@ app.use("/api/class-links", classLinkRoutes);
 app.use("/api/assignments", assignmentRoutes);
 app.use("/api/notices", teacherNoticeRoutes);
 app.use("/api/general-notices", adminNoticeRoutes);
+app.use("/api/gallery", galleryRoutes);
 
 app.get("/", (req, res) => {
   res.send("Darul Islam server is running...");

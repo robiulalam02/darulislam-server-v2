@@ -22,7 +22,7 @@ const getPublicTestimonials = async (req, res) => {
     try {
         // Filter strictly for isApproved: true
         const testimonials = await Testimonial.find({ isApproved: true })
-            .populate('user', 'name role')
+            .populate('user', 'name')
             .sort({ createdAt: -1 }); // Newest first
 
         res.status(200).json(testimonials);

@@ -72,9 +72,14 @@ const getCourses = async (req, res) => {
       filter.category = req.query.category;
     }
 
+    // URL Limit
+    const limitCount = req.query.limit ? parseInt(req.query.limit) : 0;
+
     const courses = await Course.find(filter)
       .populate("category", "name icon")
-      .populate("instructor", "name email");
+      .populate("instructor", "name email")
+      .sort({ createdAt: -1 })
+      .limit(limitCount);
 
     res.status(200).json(courses);
   } catch (error) {
