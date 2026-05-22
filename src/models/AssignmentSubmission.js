@@ -20,10 +20,10 @@ const assignmentSubmissionSchema = new mongoose.Schema(
     studentNotes: {
       type: String,
       trim: true,
-    },
+    },          
     submittedImages: [
       {
-        type: String,
+        type: String,                           
       },
     ],
     status: {
