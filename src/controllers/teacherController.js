@@ -4,12 +4,54 @@ const Course = require("../models/Course");
 
 const getPendingTeachers = async (req, res) => {
   try {
-    const pendingTeachers = await TeacherProfile.find({ isApproved: false })
-      .populate("user", "name email")
-      .populate("department", "name")
-      .sort({ createdAt: 1 });
+    const { search, status, department, experience } = req.query;
+    let profileFilter = {};
 
-    res.status(200).json(pendingTeachers);
+    // 1. Status Filter (pending / approved)
+    if (status === "pending") {
+      profileFilter.isApproved = false;
+    } else if (status === "approved") {
+      profileFilter.isApproved = true;
+    }
+
+    // 2. Department ObjectID Filter
+    if (department) {
+      profileFilter.department = department;
+    }
+
+    // 3. Experience Bangla String Filter (Exact or Regex mapping)
+    if (experience) {
+      profileFilter.experience = { $regex: experience, $options: "i" };
+    }
+
+    // 4. Name/Email Search Query Handling
+    let matchedUserIds = [];
+    if (search) {
+      const users = await User.find({
+        role: "teacher",
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+        ],
+      }).select("_id");
+
+      matchedUserIds = users.map((u) => u._id);
+
+      // Inject user reference limitation to main aggregation query
+      profileFilter.user = { $in: matchedUserIds };
+    }
+
+    // Execute Main Query with Populated References
+    const teachers = await TeacherProfile.find(profileFilter)
+      .populate("user", "name email phone profileImage")
+      .populate("department", "name")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      totalCount: teachers.length,
+      data: teachers,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

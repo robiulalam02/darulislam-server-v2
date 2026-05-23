@@ -21,15 +21,16 @@ const teacherProfileSchema = new mongoose.Schema(
     biography: {
       type: String,
     },
-    experience: {
-      type: String,
-    },
     qualifications: {
       type: String,
     },
+    experience: {
+      type: String,
+      trim: true,
+    },
     isApproved: {
       type: Boolean,
-      default: false, // Waiting approval for admin
+      default: false,
     },
   },
   {

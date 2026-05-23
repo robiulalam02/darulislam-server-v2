@@ -1,32 +1,66 @@
 const StudentProfile = require("../models/StudentProfile");
 
-// Get All Approved/Public Students Catalog (Sanitized View)
+const toBanglaNumber = (num) => {
+  const banglaDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+  return String(num)
+    .split("")
+    .map((digit) => banglaDigits[digit] || digit)
+    .join("");
+};
+
+const calculateAgeBn = (birthDateStr) => {
+  if (!birthDateStr) return "তথ্য নেই";
+
+  const birthDate = new Date(birthDateStr);
+  if (isNaN(birthDate.getTime())) return "তথ্য নেই";
+
+  const today = new Date();
+
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
+    age--;
+  }
+
+  return age > 0 ? `${toBanglaNumber(age)} বছর` : "১ বছরের কম";
+};
+
+// @desc    Get All Talented Students (Public Feed)
+// @route   GET /api/students
 const getPublicStudents = async (req, res) => {
   try {
-    // 1. Fetch student profiles (Filtering out internal system data if any)
-    const students = await StudentProfile.find({})
-      // Security Check: Only populate name & profile picture from User model.
-      // NEVER populate sensitive contact data like email, phone etc.
-      .populate("user", "name profilePicture")
-      // Populate department/technology details if referenced
+    const limitCount = req.query.limit ? parseInt(req.query.limit) : 0;
+    const { search, classLevel } = req.query;
+
+    let profileFilter = {};
+    if (classLevel) profileFilter.classLevel = classLevel;
+    if (search) profileFilter.studentNameBn = { $regex: search, $options: "i" };
+
+    const students = await StudentProfile.find(profileFilter)
+      .populate(
+        "user",
+        "name email phone profileImage birthDate permanentAddress gender",
+      )
       .populate("department", "name")
-      .sort({ createdAt: -1 }); // Showing newest students first
+      .sort({ createdAt: -1 })
+      .limit(limitCount);
 
-    // 2. Strict Data Sanitization mapping (Explicitly passing safe public properties only)
-    const sanitizedStudents = students.map((student) => ({
-      _id: student._id,
-      user: student.user, // Contains safe 'name' and 'profilePicture'
-      department: student.department,
-      rollNumber: student.rollNumber || "", // Roll or Student ID if public-facing
-      batch: student.batch || "", // Session/Batch (e.g., "2024-25")
-      skills: student.skills || [], // Technical skills or fields of interest
-      bio: student.bio || "",
-    }));
+    const resolvedStudents = students
+      .filter((student) => student.user !== null)
+      .map((student) => {
+        const studentObj = student.toObject();
+        return {
+          ...studentObj,
+          address: studentObj.user?.permanentAddress || "তথ্য নেই",
+          age: calculateAgeBn(studentObj.user?.birthDate),
+        };
+      });
 
-    res.status(200).json({
-      totalCount: sanitizedStudents.length,
-      data: sanitizedStudents,
-    });
+    res.status(200).json(resolvedStudents);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

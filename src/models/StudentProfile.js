@@ -10,6 +10,11 @@ const studentProfileSchema = new mongoose.Schema(
     },
     studentNameBn: { type: String, trim: true },
     classLevel: { type: String },
+    department: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: [true, "Please select a department (Bivag)"],
+      ref: "Category",
+    },
     fatherName: { type: String },
     fatherMobile: { type: String },
     fatherJob: { type: String },
