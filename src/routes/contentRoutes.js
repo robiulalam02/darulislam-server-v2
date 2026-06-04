@@ -8,12 +8,19 @@ const {
   updateSectionContent,
   getPublicSliders,
   createSlider,
-  deleteSlider
+  deleteSlider,
 } = require("../controllers/contentController");
 
 // Static Section Routes
 router.get("/page/:pageName/section/:sectionName", getSectionContent);
-router.put("/page/:pageName/section/:sectionName", protect, admin, updateSectionContent);
+
+router.put(
+  "/page/:pageName/section/:sectionName",
+  protect,
+  admin,
+  upload.any(),
+  updateSectionContent,
+);
 
 // Hero Slider Routes
 router.get("/sliders", getPublicSliders);

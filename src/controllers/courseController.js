@@ -220,6 +220,59 @@ const deleteCourse = async (req, res) => {
   }
 };
 
+const getDynamicCategories = async (req, res) => {
+  try {
+    const categories = await Course.aggregate([
+      { $match: { isPublished: true } },
+      {
+        // 1. Group by your exact manual category strings
+        $group: {
+          _id: "$category",
+          courseCount: { $sum: 1 }, // Calculates how many courses are in this category
+        },
+      },
+      {
+        // 2. Format variables cleanly for frontend rendering
+        $project: {
+          _id: 0,
+          name: "$_id",
+          courseCount: 1,
+        },
+      },
+      {
+        // 3. Alphabetical sorting so it looks clean regardless of language
+        $sort: { name: 1 },
+      },
+    ]);
+
+    // Filter out any accidentally empty or null string groupings
+    const activeCategories = categories.filter(
+      (cat) => cat.name && cat.name.trim() !== "",
+    );
+
+    res.status(200).json(activeCategories);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+const getCoursesByCategoryName = async (req, res) => {
+  try {
+    const { categoryName } = req.params;
+
+    // Fetch matching data from your main course documents
+    const courses = await Course.find({
+      category: categoryName,
+      isPublished: true,
+    });
+
+    res.status(200).json(courses);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
 module.exports = {
   createCourse,
   getCourses,
@@ -227,4 +280,6 @@ module.exports = {
   updateCourse,
   deleteCourse,
   getEducationPageData,
+  getDynamicCategories,
+  getCoursesByCategoryName,
 };

@@ -7,9 +7,11 @@ const {
   deleteCourse,
   getTeacherCourses,
   getEducationPageData,
+  getDynamicCategories,
+  getCoursesByCategoryName,
 } = require("../controllers/courseController");
 const { protect, instructor } = require("../middlewares/authMiddleware");
-const upload = require('../middlewares/uploadMiddleware');
+const upload = require("../middlewares/uploadMiddleware");
 
 // Public route to get courses
 router.get("/", getCourses);
@@ -18,9 +20,24 @@ router.get("/education", getEducationPageData);
 // Dashboard Route (MUST BE ABOVE /:id)
 router.get("/teacher/my-courses", protect, instructor, getTeacherCourses);
 
+router.get("/categories", getDynamicCategories);
+router.get("/filter/:categoryName", getCoursesByCategoryName);
+
 // CRUD Routes for Instructors
-router.post("/teacher/add-course", protect, instructor, upload.single('image'), createCourse);
-router.put("/teacher/:id", protect, instructor, upload.single('image'), updateCourse);
+router.post(
+  "/teacher/add-course",
+  protect,
+  instructor,
+  upload.single("image"),
+  createCourse,
+);
+router.put(
+  "/teacher/:id",
+  protect,
+  instructor,
+  upload.single("image"),
+  updateCourse,
+);
 
 // DELETE Course
 router.delete("/teacher/delete-course/:id", protect, instructor, deleteCourse);
