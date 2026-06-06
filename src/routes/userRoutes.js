@@ -2,13 +2,22 @@ const express = require("express");
 const router = express.Router();
 const {
   getAllUsers,
+  getUserById,
+  adminUpdateUser,
+  adminDeleteUser,
   updateUserRole,
   approveTeacher,
 } = require("../controllers/userController");
 const { protect, admin } = require("../middlewares/authMiddleware");
+const upload = require("../middlewares/uploadMiddleware");
 
-// অ্যাডমিন ইউজার ম্যানেজমেন্ট রাউটস
+// Admin User Management Routes
 router.get("/admin/all-users", protect, admin, getAllUsers);
+router.get("/admin/single-user/:id", protect, admin, getUserById);
+router.put("/admin/update-user/:id", upload.single("profileImage"), protect, admin, adminUpdateUser);
+router.delete("/admin/delete-user/:id", protect, admin, adminDeleteUser);
+
+// Explicit State Updates
 router.put("/admin/update-role/:id", protect, admin, updateUserRole);
 router.put("/admin/approve-teacher/:id", protect, admin, approveTeacher);
 
