@@ -45,6 +45,26 @@ const courseSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Syllabus & Curriculum Structure
+    modules: [
+      {
+        moduleName: {
+          type: String,
+          required: [true, "Please specify a module name"],
+          trim: true,
+        },
+        description: {
+          type: String,
+          default: "",
+        },
+        topics: [
+          {
+            type: String,
+            trim: true,
+          },
+        ],
+      },
+    ],
     details: {
       fullTitle: { type: String },
       description: { type: String },
