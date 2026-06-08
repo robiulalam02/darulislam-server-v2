@@ -15,9 +15,14 @@ const enrollmentSchema = new mongoose.Schema(
     batch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Batch",
-      required: [true, "Target batch selection is required"],
+      default: null,
     },
     paymentDetails: {
+      method: {
+        type: String,
+        required: [true, "Payment method selection is required"],
+        trim: true,
+      },
       senderName: {
         type: String,
         required: [true, "Sender name is required"],
@@ -25,7 +30,7 @@ const enrollmentSchema = new mongoose.Schema(
       },
       bkashNumber: {
         type: String,
-        required: [true, "bKash account number is required"],
+        required: [true, "Account number is required"],
         trim: true,
       },
       transactionId: {

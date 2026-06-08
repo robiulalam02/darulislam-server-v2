@@ -11,28 +11,25 @@ const createCourse = async (req, res) => {
       price,
       oldPrice,
       label,
-      // details fields
-      fullTitle,
-      courseDescription,
-      admissionFee,
-      oldAdmissionFee,
-      monthlyFee,
-      discount,
-      coupon,
-      batchInfo,
-      highlights,
+      details,
+      modules,
     } = req.body;
 
-    // Handle Image Upload
     const thumbnail = req.file ? req.file.path : null;
     if (!thumbnail) {
       return res.status(400).json({ message: "Course thumbnail is required" });
     }
 
-    let parsedHighlights = [];
-    if (highlights) {
-      parsedHighlights =
-        typeof highlights === "string" ? JSON.parse(highlights) : highlights;
+    let parsedDetails = {};
+    if (details) {
+      parsedDetails =
+        typeof details === "string" ? JSON.parse(details) : details;
+    }
+
+    let parsedModules = [];
+    if (modules) {
+      parsedModules =
+        typeof modules === "string" ? JSON.parse(modules) : modules;
     }
 
     const course = await Course.create({
@@ -45,17 +42,8 @@ const createCourse = async (req, res) => {
       price: price || 0,
       oldPrice: oldPrice || 0,
       label: label || "",
-      details: {
-        fullTitle: fullTitle || title,
-        description: courseDescription,
-        admissionFee: admissionFee || 0,
-        oldAdmissionFee: oldAdmissionFee || 0,
-        monthlyFee: monthlyFee || 0,
-        discount: discount || 0,
-        coupon: coupon || "",
-        batchInfo: batchInfo || "",
-        highlights: parsedHighlights,
-      },
+      modules: parsedModules,
+      details: parsedDetails,
     });
 
     res.status(201).json(course);
@@ -72,7 +60,6 @@ const getCourses = async (req, res) => {
       filter.category = req.query.category;
     }
 
-    // URL Limit
     const limitCount = req.query.limit ? parseInt(req.query.limit) : 0;
 
     const courses = await Course.find(filter)
@@ -89,7 +76,6 @@ const getCourses = async (req, res) => {
 
 const getEducationPageData = async (req, res) => {
   try {
-    // List of categories we want to show
     const fixedCategories = [
       "একাডেমিক কোর্স সমূহ",
       "বান্ডেল কোর্স সমূহ",
@@ -97,7 +83,6 @@ const getEducationPageData = async (req, res) => {
       "প্রিমিয়াম কোর্স সমূহ",
     ];
 
-    // fetch data for each category
     const groupedData = await Promise.all(
       fixedCategories.map(async (catName) => {
         const courses = await Course.find({
@@ -105,8 +90,8 @@ const getEducationPageData = async (req, res) => {
           isPublished: true,
         })
           .select("title image price oldPrice label details")
-          .sort({ createdAt: -1 }) // show new courses first
-          .limit(10); // Limit 10 courses per category
+          .sort({ createdAt: -1 })
+          .limit(10);
 
         return {
           category: catName,
@@ -124,7 +109,6 @@ const getEducationPageData = async (req, res) => {
       }),
     );
 
-    // Filter Categories which has atleast one course
     const filteredData = groupedData.filter(
       (group) => group.courses.length > 0,
     );
@@ -152,35 +136,27 @@ const updateCourse = async (req, res) => {
     const course = await Course.findById(req.params.id);
     if (!course) return res.status(404).json({ message: "Course not found" });
 
-    // 1. Handle Root Level Data
-    const { highlights, ...restOfBody } = req.body;
+    const { details, modules, ...restOfBody } = req.body;
     let updateData = { ...restOfBody };
 
     if (req.file) {
-      updateData.image = req.file.path; // New image from Couldinary
+      updateData.image = req.file.path;
     }
 
-    // Handle Nested Details Data
-    if (
-      req.body.fullTitle ||
-      req.body.description ||
-      req.body.admissionFee ||
-      highlights
-    ) {
+    if (details) {
+      const parsedDetails =
+        typeof details === "string" ? JSON.parse(details) : details;
       updateData.details = {
         ...course.details,
-        fullTitle: req.body.fullTitle || course.details.fullTitle,
-        description: req.body.description || course.details.description,
-        admissionFee: req.body.admissionFee || course.details.admissionFee,
-        highlights: highlights
-          ? typeof highlights === "string"
-            ? JSON.parse(highlights)
-            : highlights
-          : course.details.highlights,
+        ...parsedDetails,
       };
     }
 
-    // Final Update
+    if (modules) {
+      updateData.modules =
+        typeof modules === "string" ? JSON.parse(modules) : modules;
+    }
+
     const updatedCourse = await Course.findByIdAndUpdate(
       req.params.id,
       { $set: updateData },
@@ -225,14 +201,12 @@ const getDynamicCategories = async (req, res) => {
     const categories = await Course.aggregate([
       { $match: { isPublished: true } },
       {
-        // 1. Group by your exact manual category strings
         $group: {
           _id: "$category",
-          courseCount: { $sum: 1 }, // Calculates how many courses are in this category
+          courseCount: { $sum: 1 },
         },
       },
       {
-        // 2. Format variables cleanly for frontend rendering
         $project: {
           _id: 0,
           name: "$_id",
@@ -240,12 +214,10 @@ const getDynamicCategories = async (req, res) => {
         },
       },
       {
-        // 3. Alphabetical sorting so it looks clean regardless of language
         $sort: { name: 1 },
       },
     ]);
 
-    // Filter out any accidentally empty or null string groupings
     const activeCategories = categories.filter(
       (cat) => cat.name && cat.name.trim() !== "",
     );
@@ -256,12 +228,10 @@ const getDynamicCategories = async (req, res) => {
   }
 };
 
-
 const getCoursesByCategoryName = async (req, res) => {
   try {
     const { categoryName } = req.params;
 
-    // Fetch matching data from your main course documents
     const courses = await Course.find({
       category: categoryName,
       isPublished: true,
@@ -271,7 +241,7 @@ const getCoursesByCategoryName = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-}
+};
 
 module.exports = {
   createCourse,
