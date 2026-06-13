@@ -22,12 +22,14 @@ const createCourse = async (req, res) => {
 
     let parsedDetails = {};
     if (details) {
-      parsedDetails = typeof details === "string" ? JSON.parse(details) : details;
+      parsedDetails =
+        typeof details === "string" ? JSON.parse(details) : details;
     }
 
     let parsedModules = [];
     if (modules) {
-      parsedModules = typeof modules === "string" ? JSON.parse(modules) : modules;
+      parsedModules =
+        typeof modules === "string" ? JSON.parse(modules) : modules;
     }
 
     const course = await Course.create({
@@ -90,12 +92,8 @@ const getEducationPageData = async (req, res) => {
 
     const groupedData = await Promise.all(
       fixedCategories.map(async (catName) => {
-        const targetCategory = await Category.findOne({ name: catName });
-        if (!targetCategory)
-          return { category: catName, type: "card", courses: [] };
-
         const courses = await Course.find({
-          category: targetCategory._id,
+          category: catName,
           isPublished: true,
         })
           .select("title image price oldPrice label details")
@@ -153,7 +151,8 @@ const updateCourse = async (req, res) => {
     }
 
     if (details) {
-      const parsedDetails = typeof details === "string" ? JSON.parse(details) : details;
+      const parsedDetails =
+        typeof details === "string" ? JSON.parse(details) : details;
       updateData.details = {
         ...course.details,
         ...parsedDetails,
@@ -161,7 +160,8 @@ const updateCourse = async (req, res) => {
     }
 
     if (modules) {
-      updateData.modules = typeof modules === "string" ? JSON.parse(modules) : modules;
+      updateData.modules =
+        typeof modules === "string" ? JSON.parse(modules) : modules;
     }
 
     const updatedCourse = await Course.findByIdAndUpdate(
@@ -210,7 +210,7 @@ const toggleCourseFeatured = async (req, res) => {
     const course = await Course.findByIdAndUpdate(
       req.params.id,
       { isFeatured },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!course) {
