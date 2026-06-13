@@ -1,4 +1,5 @@
 const StudentProfile = require("../models/StudentProfile");
+const Batch = require("../models/Batch");
 
 const toBanglaNumber = (num) => {
   const banglaDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
@@ -87,7 +88,43 @@ const toggleStudentFeatured = async (req, res) => {
   }
 };
 
+const getEnrolledCourses = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+
+    const batches = await Batch.find({ enrolledStudents: studentId }).populate({
+      path: "course",
+      populate: {
+        path: "instructor",
+        select: "name email profileImage",
+      },
+    });
+
+    const enrolledCoursesMap = new Map();
+
+    batches.forEach((batch) => {
+      if (
+        batch.course &&
+        !enrolledCoursesMap.has(batch.course._id.toString())
+      ) {
+        enrolledCoursesMap.set(batch.course._id.toString(), batch.course);
+      }
+    });
+
+    const courses = Array.from(enrolledCoursesMap.values());
+
+    res.status(200).json({
+      success: true,
+      count: courses.length,
+      data: courses,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getPublicStudents,
   toggleStudentFeatured,
+  getEnrolledCourses,
 };
