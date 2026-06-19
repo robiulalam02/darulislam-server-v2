@@ -1,5 +1,6 @@
 const Course = require("../models/Course");
 const Category = require("../models/Category");
+const mongoose = require("mongoose");
 
 const createCourse = async (req, res) => {
   try {
@@ -57,15 +58,24 @@ const createCourse = async (req, res) => {
 
 const getCourses = async (req, res) => {
   try {
-    // 🔹 সিনিয়র অপ্টিমাইজেশন ফিক্স: কুয়েরি সার্চ সিঙ্কের সুবিধার্থে ডিফ্ল্ট অবজেক্ট ক্লিনআপ
     let filter = {};
 
     if (req.query.category) {
       filter.category = req.query.category;
     }
+
     if (req.query.subCategory) {
-      filter.subCategory = req.query.subCategory; // 👈 চেকআউট পেজের ড্রপডাউন এটি রিড করবে
+      const subId = req.query.subCategory;
+      if (mongoose.Types.ObjectId.isValid(subId)) {
+        filter.$or = [
+          { subCategory: new mongoose.Types.ObjectId(subId) },
+          { subCategory: String(subId) },
+        ];
+      } else {
+        filter.subCategory = subId;
+      }
     }
+
     if (req.query.courseCategoryType) {
       filter.courseCategoryType = req.query.courseCategoryType;
     }
@@ -81,8 +91,13 @@ const getCourses = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(limitCount);
 
-    res.status(200).json(courses);
+    res.status(200).json({
+      success: true,
+      count: courses.length,
+      data: courses,
+    });
   } catch (error) {
+    console.error("Error in getCourses backend handler:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -91,8 +106,6 @@ const getEducationPageData = async (req, res) => {
   try {
     const activeCategories = await Category.find({});
 
-    // 🔹 সলিউশন: .lean() যুক্ত করা হয়েছে যাতে মঙ্গুজ স্কিমার টাইপ রিলেশন বাইপাস করে
-    // সরাসরি মঙ্গোডিবি-র র (Raw) অবজেক্ট ফরম্যাট জাভাস্ক্রিপ্ট মেমোরিতে চলে আসে।
     const allCourses = await Course.find({}).sort({ createdAt: -1 }).lean();
 
     const fixedCategories = [
@@ -108,7 +121,6 @@ const getEducationPageData = async (req, res) => {
       const matchedCourses = allCourses.filter((course) => {
         if (!course.category) return false;
 
-        // ডিরেক্ট স্ট্রিং কনভার্সন ট্র্যাকিং
         const courseCatStr = String(course.category).trim();
         return courseCatStr === catName.trim();
       });
