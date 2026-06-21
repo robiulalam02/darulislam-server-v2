@@ -21,6 +21,10 @@ const categorySchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    isFeatured: {
+      type: Boolean,
+      default: false,
+    },
     subCategories: [
       {
         name: {
@@ -35,7 +39,6 @@ const categorySchema = new mongoose.Schema(
           lowercase: true,
         },
         image: {
-          // 🔹 নতুন রিকোয়ারমেন্ট ফিক্স: সাব-ক্যাটাগরির নিজস্ব কোর্স ইমেজ ফিল্ড
           type: String,
           default: "",
         },

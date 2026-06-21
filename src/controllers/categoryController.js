@@ -1,7 +1,6 @@
 const Category = require("../models/Category");
 const mongoose = require("mongoose");
 
-// Helper function to generate clean localized slugs
 const generateSlug = (text) => {
   if (!text) return "";
   return text
@@ -14,7 +13,13 @@ const generateSlug = (text) => {
 
 const getCategories = async (req, res) => {
   try {
+    let matchQuery = {};
+    if (req.query.isFeatured) {
+      matchQuery.isFeatured = req.query.isFeatured === "true";
+    }
+
     const categories = await Category.aggregate([
+      { $match: matchQuery },
       {
         $lookup: {
           from: "courses",
@@ -44,7 +49,7 @@ const getCategories = async (req, res) => {
 
 const createCategory = async (req, res) => {
   try {
-    const { name, description, isActive, subCategories } = req.body;
+    const { name, description, isActive, isFeatured, subCategories } = req.body;
 
     const categoryExists = await Category.findOne({ name });
     if (categoryExists) {
@@ -91,6 +96,7 @@ const createCategory = async (req, res) => {
       image: imageUrl,
       description,
       isActive: isActive === "false" ? false : true,
+      isFeatured: isFeatured === "true" ? true : false,
       subCategories: formattedSubCategories,
     });
 
@@ -107,16 +113,23 @@ const updateCategory = async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    const { name, description, isActive, subCategories, isMainCategoryQuery } =
-      req.body;
+    const {
+      name,
+      description,
+      isActive,
+      isFeatured,
+      subCategories,
+      isMainCategoryQuery,
+    } = req.body;
     let updateData = {};
 
     if (name) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (isActive !== undefined)
       updateData.isActive = isActive === "false" ? false : true;
+    if (isFeatured !== undefined)
+      updateData.isFeatured = isFeatured === "true" ? true : false;
 
-    // 🔹 ফিক্স ১: শুধুমাত্র তখনই প্রধান ক্যাটাগরির ছবি বদলাবে যখন ফ্রন্টএন্ড থেকে 'isMainCategoryQuery' ফ্ল্যাগ আসবে
     if (req.file && isMainCategoryQuery === "true") {
       updateData.image = req.file.path;
     }
@@ -130,15 +143,12 @@ const updateCategory = async (req, res) => {
       if (Array.isArray(parsedSub)) {
         updateData.subCategories = parsedSub.map((sub) => {
           const baseSub = typeof sub === "string" ? { name: sub } : sub;
-
           let currentSubImage = baseSub.image || "";
 
-          // 🔹 ফিক্স ২: ফ্রন্টএন্ড মোডাল থেকে যে সাব-ক্যাটাগটিতে 'isNewlyUploaded: true' মার্ক করা থাকবে, শুধু সেটির ইমেজই আপডেট হবে
           if (req.file && baseSub.isNewlyUploaded === true) {
             currentSubImage = req.file.path;
           }
 
-          // ডাটাবেজে সেভ করার আগে টেম্পোরারি ফ্ল্যাগটি মুছে ফেলা
           delete baseSub.isNewlyUploaded;
 
           return {
@@ -148,7 +158,7 @@ const updateCategory = async (req, res) => {
               : new mongoose.Types.ObjectId(),
             name: baseSub.name,
             slug: baseSub.slug || generateSlug(baseSub.name),
-            image: currentSubImage, // 🎯 এখন শুধুমাত্র নির্দিষ্ট উপ-বিভাগের ছবিই সেভ হবে
+            image: currentSubImage,
             fullTitle: baseSub.fullTitle || baseSub.name,
             classSchedule: baseSub.classSchedule || "",
             icon: baseSub.icon || "BookOpen",
@@ -182,10 +192,32 @@ const updateCategory = async (req, res) => {
   }
 };
 
+const toggleCategoryFeatured = async (req, res) => {
+  try {
+    const { isFeatured } = req.body;
+    const category = await Category.findByIdAndUpdate(
+      req.params.id,
+      { isFeatured },
+      { new: true, runValidators: true },
+    );
+
+    if (!category) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Category featured status updated successfully",
+      category,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const deleteCategory = async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
-
     if (!category) {
       return res.status(404).json({ message: "Category not found" });
     }
@@ -204,7 +236,6 @@ const getCategoryByIdOrSlug = async (req, res) => {
     const { idOrSlug } = req.params;
     let query = {};
 
-    // Check if parameter matches MongoDB ObjectId format
     if (idOrSlug.match(/^[0-9a-fA-F]{24}$/)) {
       query._id = idOrSlug;
     } else {
@@ -226,6 +257,7 @@ module.exports = {
   getCategories,
   createCategory,
   updateCategory,
+  toggleCategoryFeatured,
   deleteCategory,
   getCategoryByIdOrSlug,
 };
