@@ -147,7 +147,7 @@ const getDashboardStats = async (req, res) => {
   try {
     const teacherId = req.user._id;
 
-    // ১. প্যারালাল প্রমিজ আর্কিটেকচার (ডাটাবেজ পারফরম্যান্স ফাস্ট রাখার ট্রিক)
+    // Parallal Promise Architechture
     const [teacher, profile, ownCourses] = await Promise.all([
       User.findById(teacherId).select("-password").lean(),
       TeacherProfile.findOne({ user: teacherId })
@@ -162,10 +162,9 @@ const getDashboardStats = async (req, res) => {
         .json({ success: false, message: "শিক্ষকের প্রোফাইল পাওয়া যায়নি" });
     }
 
-    // 🎯 🎯 মেগা ফিক্স লক: ওল্ড টাইপো 'course._id' বদলে 'c._id' করা হলো
     const courseIds = ownCourses.map((c) => c._id);
 
-    // ২. আজকের ক্লাসের সংখ্যা হিসাব (Date Range Matching)
+    // 2. Todays Class Counts
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const endOfToday = new Date();
@@ -184,12 +183,12 @@ const getDashboardStats = async (req, res) => {
         .lean(),
     ]);
 
-    // ৩. ইউনিক শিক্ষার্থীর সংখ্যা ফিল্টারিং (একই ছাত্র একাধিক কোর্সে থাকতে পারে)
+    // Unique Student Filtering
     const uniqueStudentIds = new Set(
       enrollments.map((e) => e.student?.toString()).filter(Boolean),
     );
-
-    // ৪. চুড়ান্ত রেসপন্স অবজেক্ট
+    
+    // Final Response
     res.status(200).json({
       success: true,
       data: {
@@ -203,6 +202,8 @@ const getDashboardStats = async (req, res) => {
           designation: profile?.designation || "শিক্ষক",
           departmentName: profile?.department?.name || "দ্বীনি বিভাগ",
           isApproved: profile?.isApproved || false,
+          teacherId: profile?.teacherId || "",
+  
         },
         stats: {
           todayClasses: todayClassesCount,

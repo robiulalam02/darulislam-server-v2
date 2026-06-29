@@ -35,7 +35,7 @@ app.use(
         "http://localhost:3000",
         "https://darulislam2.vercel.app",
         "https://darulislaminstitute.com",      
-        "https://www.darulislaminstitute.com", 
+        "https://www.darulislaminstitute.com",
       ];
 
       if (!origin || allowedOrigins.includes(origin)) {

@@ -7,7 +7,8 @@ const {
   adminDeleteUser,
   updateUserRole,
   approveTeacher,
-  getTeacherStudents, // 🎯 নতুন কন্ট্রোলার ইমপোর্ট
+  getTeacherStudents,
+  approveStudent,
 } = require("../controllers/userController");
 const { protect, admin } = require("../middlewares/authMiddleware");
 const upload = require("../middlewares/uploadMiddleware");
@@ -27,11 +28,11 @@ router.delete("/admin/delete-user/:id", protect, admin, adminDeleteUser);
 // Explicit State Updates
 router.put("/admin/update-role/:id", protect, admin, updateUserRole);
 router.put("/admin/approve-teacher/:id", protect, admin, approveTeacher);
+router.put("/admin/approve-student/:id", protect, admin, approveStudent);
 
 // ==========================================
 // Teacher Dynamic Operations
 // ==========================================
-// 🎯 নতুন সিকিউর রাউট: শিক্ষক তাঁর আন্ডারের শিক্ষার্থীদের তালিকা দেখতে পারবেন
 router.get("/teacher/my-students", protect, getTeacherStudents);
 
 module.exports = router;

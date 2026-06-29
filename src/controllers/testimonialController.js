@@ -5,10 +5,8 @@ const createTestimonial = async (req, res) => {
   try {
     const { text, rating, userType } = req.body;
 
-    // 🎯 multer-এর 'upload.single' থেকে অপশনাল ইমেজ ফাইল রিসিভ করার মেকানিজম
     let identityImage = null;
     if (req.file) {
-      // যদি আপনি ক্লাউডিনারি ব্যবহার করেন তবে req.file.path হবে, লোকাল স্টোরেজ হলে req.file.filename বা custom path
       identityImage = req.file.path || req.file.filename;
     }
 
@@ -34,7 +32,7 @@ const getPublicTestimonials = async (req, res) => {
     // strictly filter for approved items
     const queryCondition = { isApproved: true };
 
-    // 🎯 ডাইনামিক কুয়েরি ফিল্টার লক (শিক্ষার্থী, ওস্তাদ, ওস্তাদা, অভিভাবক এর জন্য)
+    // Dynamix Query Filtering
     if (userType) {
       queryCondition.userType = userType;
     }

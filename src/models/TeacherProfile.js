@@ -9,6 +9,12 @@ const teacherProfileSchema = new mongoose.Schema(
       ref: "User",
       unique: true,
     },
+    teacherId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
     teacherNameBn: { type: String, trim: true },
     department: {
       type: mongoose.Schema.Types.ObjectId,

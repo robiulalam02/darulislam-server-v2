@@ -102,7 +102,7 @@ const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ message: "অর্ডারটি খুঁজে পাওয়া যায়নি" });
     }
 
-    // ফিউচার বিকাশ ইন্টিগ্রেশনের সুবিধার্থে: যদি অর্ডার ডেলিভারড হয়ে যায়, তবে পেমেন্ট স্ট্যাটাসও পেইড করে দেওয়া
+    // If order is delivered then make payment paid
     if (
       orderStatus === "delivered" &&
       updatedOrder.paymentDetails.status === "unpaid"

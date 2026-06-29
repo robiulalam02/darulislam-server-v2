@@ -38,7 +38,7 @@ const createCampaign = async (req, res) => {
       title,
       slug,
       description,
-      image: req.file.path, // 👈 Cloudinary secure asset URL from middleware
+      image: req.file.path,
       goalAmount: Number(goalAmount),
       createdBy: req.user._id,
     });

@@ -9,6 +9,16 @@ const studentProfileSchema = new mongoose.Schema(
       ref: "User",
       unique: true,
     },
+    studentId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+    isApproved: {
+      type: Boolean,
+      default: false,
+    },
     studentNameBn: { type: String, trim: true },
     classLevel: { type: String },
     department: {

@@ -1,6 +1,8 @@
 const Enrollment = require("../models/Enrollment");
 const Batch = require("../models/Batch");
 const Course = require("../models/Course");
+const StudentProfile = require("../models/StudentProfile");
+const TeacherProfile = require("../models/TeacherProfile");
 
 const createEnrollmentRequest = async (req, res) => {
   try {
@@ -47,26 +49,53 @@ const createEnrollmentRequest = async (req, res) => {
 
 const getEnrollmentLogs = async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, searchId } = req.query;
     let query = {};
 
     if (status) query.status = status;
+
+    if (searchId) {
+      const matchedProfile = await StudentProfile.findOne({
+        studentId: { $regex: searchId.trim(), $options: "i" },
+      });
+      if (matchedProfile) {
+        query.student = matchedProfile.user;
+      } else {
+        return res.status(200).json({ success: true, count: 0, data: [] });
+      }
+    }
 
     const logs = await Enrollment.find(query)
       .populate("student", "name email profileImage")
       .populate("course", "title price")
       .populate("batch", "batchName maxSeats enrolledStudents")
       .sort({ createdAt: -1 })
-      .lean(); // 🎯 সিনিয়র ট্রিক ১: .lean() যুক্ত করার ফলে মঙ্গুজের ইন্টারনাল মেটাডাটা প্রপার্টি রিমুভ হয়ে পিওর JS অবজেক্টে কনভার্ট হবে
+      .lean();
 
-    // 🎯 সিনিয়র ট্রিক ২: ডিফেন্সিভ অবজেক্ট স্যানিটাইজেশন লক (যা ফ্রন্টএন্ডের ক্র্যাশ হওয়া চিরতরে বন্ধ করবে)
+    // Map All Users ID's
+    const studentUserIds = logs.map((log) => log.student?._id).filter(Boolean);
+
+    // Took Real Time Custom ID from their Profile
+    const studentProfiles = await StudentProfile.find({
+      user: { $in: studentUserIds },
+    })
+      .select("user studentId")
+      .lean();
+
     const sanitizedLogs = logs.map((log) => {
+      const matchedProfile = studentProfiles.find(
+        (p) => log.student && p.user.toString() === log.student._id.toString(),
+      );
+
       return {
         ...log,
-        // যদি ডাটাবেজে স্টুডেন্ট বা কোর্স ডিলিট হয়ে নাল থাকে, তবে ক্র্যাশ প্রটেকশন ফলব্যাক অবজেক্ট বসবে
-        student: log.student || { name: "Unknown Student", email: "N/A" },
+        student: log.student
+          ? {
+              ...log.student,
+              studentId: matchedProfile ? matchedProfile.studentId : null,
+            }
+          : { name: "Unknown Student", email: "N/A", studentId: null },
         course: log.course || { title: "Unknown Course", price: 0 },
-        // যদি ব্যাচ নাল (null) বা আনডিফাইন্ড থাকে, তবে ফ্রন্টএন্ডকে ডিরেক্ট সেফ অবজেক্ট পাস করা হলো
         batch: log.batch || {
           batchName: "Not Allocated Yet",
           maxSeats: 0,
@@ -78,7 +107,7 @@ const getEnrollmentLogs = async (req, res) => {
     res.status(200).json({
       success: true,
       count: sanitizedLogs.length,
-      data: sanitizedLogs, // 🎯 ফ্রন্টএন্ডের useQuery এই ডেটা রিড করবে সেফলি
+      data: sanitizedLogs,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -101,11 +130,9 @@ const approveEnrollment = async (req, res) => {
     }
 
     if (!alternateBatchId) {
-      return res
-        .status(400)
-        .json({
-          message: "Please select a specific batch to allocate this student",
-        });
+      return res.status(400).json({
+        message: "Please select a specific batch to allocate this student",
+      });
     }
 
     const batch = await Batch.findById(alternateBatchId);
@@ -121,7 +148,6 @@ const approveEnrollment = async (req, res) => {
       });
     }
 
-    // ব্যাচে স্টুডেন্ট পুশ করা হচ্ছে
     batch.enrolledStudents.push(enrollment.student);
 
     if (teacherId) {

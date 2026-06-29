@@ -2,6 +2,7 @@ const Course = require("../models/Course");
 const Category = require("../models/Category");
 const mongoose = require("mongoose");
 
+// Create new course (handles dynamic courseType)
 const createCourse = async (req, res) => {
   try {
     const {
@@ -34,6 +35,12 @@ const createCourse = async (req, res) => {
         typeof modules === "string" ? JSON.parse(modules) : modules;
     }
 
+    // If academic type, force courseType to "academic"
+    const finalCourseType =
+      courseCategoryType === "academic"
+        ? "academic"
+        : (courseType || "general").toLowerCase().trim();
+
     const course = await Course.create({
       title,
       image: req.file.path,
@@ -42,7 +49,7 @@ const createCourse = async (req, res) => {
       courseCategoryType: courseCategoryType || "general",
       instructor: req.user._id,
       duration,
-      courseType,
+      courseType: finalCourseType,
       price: courseCategoryType === "academic" ? 0 : price || 0,
       oldPrice: courseCategoryType === "academic" ? 0 : oldPrice || 0,
       label: label || "",
@@ -56,6 +63,128 @@ const createCourse = async (req, res) => {
   }
 };
 
+// Get education page data with categorized course sections
+const getEducationPageData = async (req, res) => {
+  try {
+    const activeCategories = await Category.find({});
+
+    const allCourses = await Course.find({ isPublished: true })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Section setup for fixed course groups
+    const fixedSections = [
+      { key: "free", label: "ফ্রি কোর্স সমূহ" },
+      { key: "academic", label: "একাডেমিক কোর্স সমূহ" },
+      { key: "bundle", label: "বান্ডেল কোর্স সমূহ" },
+      { key: "deras", label: "দরসি কিতাব কোর্স সমূহ" },
+      { key: "premium", label: "প্রিমিয়াম কোর্স সমূহ" },
+      { key: "short", label: "শর্ট কোর্স সমূহ" },
+    ];
+
+    // Categorize courses by section config
+    const fixedGroupedData = fixedSections.map((section) => {
+      const matchedCourses = allCourses.filter((course) => {
+        // For "academic", match both courseType and courseCategoryType
+        if (section.key === "academic") {
+          return (
+            String(course.courseType || "")
+              .toLowerCase()
+              .trim() === "academic" ||
+            String(course.courseCategoryType || "")
+              .toLowerCase()
+              .trim() === "academic"
+          );
+        }
+        // For other sections, match by courseType
+        return (
+          String(course.courseType || "")
+            .toLowerCase()
+            .trim() === section.key
+        );
+      });
+
+      return {
+        categoryName: section.label,
+        category: section.label,
+        type: "card",
+        courses: matchedCourses.slice(0, 10).map((c) => ({
+          id: c._id,
+          title: c.title,
+          price: c.price,
+          oldPrice: c.oldPrice,
+          label: c.label,
+          image: c.image,
+          details: c.details || {},
+        })),
+      };
+    });
+
+    // Filter out empty course groups
+    const validFixedGroups = fixedGroupedData.filter(
+      (group) => group.courses.length > 0,
+    );
+
+    res.status(200).json({
+      dynamicCategories: activeCategories || [],
+      courseSections: validFixedGroups,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update course with dynamic courseType control
+const updateCourse = async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id);
+    if (!course) return res.status(404).json({ message: "Course not found" });
+
+    const { details, modules, courseType, ...restOfBody } = req.body;
+    let updateData = { ...restOfBody };
+
+    if (req.file) {
+      updateData.image = req.file.path;
+    }
+
+    if (details) {
+      const parsedDetails =
+        typeof details === "string" ? JSON.parse(details) : details;
+      updateData.details = {
+        ...course.details,
+        ...parsedDetails,
+      };
+    }
+
+    if (modules) {
+      updateData.modules =
+        typeof modules === "string" ? JSON.parse(modules) : modules;
+    }
+
+    if (courseType) {
+      updateData.courseType = String(courseType).toLowerCase().trim();
+    }
+
+    // If academic, lock price, oldPrice, courseType
+    if (updateData.courseCategoryType === "academic") {
+      updateData.price = 0;
+      updateData.oldPrice = 0;
+      updateData.courseType = "academic";
+    }
+
+    const updatedCourse = await Course.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateData },
+      { new: true, runValidators: true },
+    );
+
+    res.status(200).json(updatedCourse);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get courses, supports basic filtering
 const getCourses = async (req, res) => {
   try {
     let filter = {};
@@ -83,6 +212,10 @@ const getCourses = async (req, res) => {
       filter.isFeatured = req.query.isFeatured === "true";
     }
 
+    if (req.query.courseType) {
+      filter.courseType = String(req.query.courseType).toLowerCase().trim();
+    }
+
     const limitCount = req.query.limit ? parseInt(req.query.limit) : 0;
 
     const courses = await Course.find(filter)
@@ -102,62 +235,11 @@ const getCourses = async (req, res) => {
   }
 };
 
-const getEducationPageData = async (req, res) => {
-  try {
-    const activeCategories = await Category.find({});
-
-    const allCourses = await Course.find({}).sort({ createdAt: -1 }).lean();
-
-    const fixedCategories = [
-      "ফ্রি কোর্স সমূহ",
-      "একাডেমিক কোর্স সমূহ",
-      "বান্ডেল কোর্স সমূহ",
-      "দরসি কিতাব কোর্স সমূহ",
-      "প্রিমিয়াম কোর্স সমূহ",
-      "শর্ট কোর্স সমূহ",
-    ];
-
-    const fixedGroupedData = fixedCategories.map((catName) => {
-      const matchedCourses = allCourses.filter((course) => {
-        if (!course.category) return false;
-
-        const courseCatStr = String(course.category).trim();
-        return courseCatStr === catName.trim();
-      });
-
-      return {
-        categoryName: catName,
-        category: catName,
-        type: "card",
-        courses: matchedCourses.slice(0, 10).map((c) => ({
-          id: c._id,
-          title: c.title,
-          price: c.price,
-          oldPrice: c.oldPrice,
-          label: c.label,
-          image: c.image,
-          details: c.details || {},
-        })),
-      };
-    });
-
-    const validFixedGroups = fixedGroupedData.filter(
-      (group) => group.courses.length > 0,
-    );
-
-    res.status(200).json({
-      dynamicCategories: activeCategories || [],
-      courseSections: validFixedGroups,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
+// Get teacher's own courses with search/filter
 const getTeacherCourses = async (req, res) => {
   try {
     const teacherId = req.user._id;
-    const { search, courseCategoryType, courseType } = req.query; // ফ্রন্টএন্ড সার্চ প্যারামিটার
+    const { search, courseCategoryType, courseType } = req.query;
 
     let queryConditions = { instructor: teacherId };
 
@@ -166,7 +248,7 @@ const getTeacherCourses = async (req, res) => {
     }
 
     if (courseType) {
-      queryConditions.courseType = courseType;
+      queryConditions.courseType = String(courseType).toLowerCase().trim();
     }
 
     if (search && search.trim() !== "") {
@@ -187,49 +269,7 @@ const getTeacherCourses = async (req, res) => {
   }
 };
 
-const updateCourse = async (req, res) => {
-  try {
-    const course = await Course.findById(req.params.id);
-    if (!course) return res.status(404).json({ message: "Course not found" });
-
-    const { details, modules, ...restOfBody } = req.body;
-    let updateData = { ...restOfBody };
-
-    if (req.file) {
-      updateData.image = req.file.path;
-    }
-
-    if (details) {
-      const parsedDetails =
-        typeof details === "string" ? JSON.parse(details) : details;
-      updateData.details = {
-        ...course.details,
-        ...parsedDetails,
-      };
-    }
-
-    if (modules) {
-      updateData.modules =
-        typeof modules === "string" ? JSON.parse(modules) : modules;
-    }
-
-    if (updateData.courseCategoryType === "academic") {
-      updateData.price = 0;
-      updateData.oldPrice = 0;
-    }
-
-    const updatedCourse = await Course.findByIdAndUpdate(
-      req.params.id,
-      { $set: updateData },
-      { new: true, runValidators: true },
-    );
-
-    res.status(200).json(updatedCourse);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
+// Delete a course (auth: instructor or admin)
 const deleteCourse = async (req, res) => {
   try {
     const course = await Course.findById(req.params.id);
@@ -253,6 +293,7 @@ const deleteCourse = async (req, res) => {
   }
 };
 
+// Toggle featured status of a course
 const toggleCourseFeatured = async (req, res) => {
   try {
     const { isFeatured } = req.body;
@@ -274,6 +315,7 @@ const toggleCourseFeatured = async (req, res) => {
   }
 };
 
+// Get categories with count of published courses
 const getDynamicCategories = async (req, res) => {
   try {
     const categories = await Course.aggregate([
@@ -309,6 +351,7 @@ const getDynamicCategories = async (req, res) => {
   }
 };
 
+// Get all courses under a specific category name
 const getCoursesByCategoryName = async (req, res) => {
   try {
     const { categoryName } = req.params;

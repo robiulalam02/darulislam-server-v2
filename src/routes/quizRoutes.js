@@ -12,7 +12,7 @@ const {
 } = require("../controllers/quizController");
 
 const { protect, admin } = require("../middlewares/authMiddleware");
-const upload = require("../middlewares/uploadMiddleware"); // Existing multer configuration file path
+const upload = require("../middlewares/uploadMiddleware");
 
 // Public routes for visitors taking tests
 router.get("/questions", getPublicQuestions);

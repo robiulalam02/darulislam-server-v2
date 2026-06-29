@@ -13,7 +13,7 @@ const registerUser = async (req, res) => {
       $or: [{ email }, { phone: studentMobile }],
     });
     if (userExists) {
-      return res.status(400).json({ message: "ব্যবহারকারী ইতিমধ্যে বিদ্যমান" });
+      return res.status(400).json({ message: "User already exists" });
     }
 
     const profileImage = req.file ? req.file.path : null;
@@ -33,9 +33,21 @@ const registerUser = async (req, res) => {
       permanentAddress: req.body.permanentAddress,
     });
 
+    // Create student or teacher profile
     if (user.role === "student") {
+      const currentYear = new Date().getFullYear();
+
+      // Generate next sequential studentId
+      const totalStudentsWithId = await StudentProfile.countDocuments({
+        studentId: { $ne: null },
+      });
+
+      const nextSequence = String(totalStudentsWithId + 1).padStart(4, "0");
+      const generatedStudentId = `DIS-${currentYear}-${nextSequence}`;
+
       await StudentProfile.create({
         user: user._id,
+        studentId: generatedStudentId,
         studentNameBn: req.body.studentNameBn,
         classLevel: req.body.classLevel,
         department: req.body.department,
@@ -91,12 +103,12 @@ const loginUser = async (req, res) => {
       if (user.role === "teacher") {
         profileData = await TeacherProfile.findOne({ user: user._id }).populate(
           "department",
-          "name",
+          "name"
         );
       } else if (user.role === "student") {
         profileData = await StudentProfile.findOne({ user: user._id }).populate(
           "department",
-          "name",
+          "name"
         );
       }
 
@@ -118,24 +130,21 @@ const loginUser = async (req, res) => {
   }
 };
 
-// 🎯 রি-ফ্যাক্টরিং: প্রোফাইল আপডেট এপিআই (পাসওয়ার্ড ওভাররাইট ব্লকিং টেকনিকসহ)
 const updateProfile = async (req, res) => {
   try {
     const userId = req.user._id;
     const { profileData, ...userUpdates } = req.body;
 
-    // 🔒 সিকিউরিটি লক: এই এপিআই দিয়ে কোনোভাবেই পাসওয়ার্ড বা রোল ম্যানিপুলেট করা যাবে না
     delete userUpdates.password;
     delete userUpdates.role;
 
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "ইউজার পাওয়া যায়নি" });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     if (req.file) {
       userUpdates.profileImage = req.file.path;
     }
 
-    // মেইন ইউজার অবজেক্ট আপডেট
     Object.keys(userUpdates).forEach((key) => {
       user[key] = userUpdates[key];
     });
@@ -145,47 +154,42 @@ const updateProfile = async (req, res) => {
       typeof profileData === "string" ? JSON.parse(profileData) : profileData;
     let updatedProfile = null;
 
+    // Prevent updating custom ids
+    if (parsedProfileData) {
+      delete parsedProfileData.studentId;
+      delete parsedProfileData.teacherId;
+    }
+
     if (user.role === "student" && parsedProfileData) {
       updatedProfile = await StudentProfile.findOneAndUpdate(
         { user: userId },
         { $set: parsedProfileData },
-        { new: true, runValidators: true },
+        { new: true, runValidators: true }
       ).populate("department", "name");
     } else if (user.role === "teacher" && parsedProfileData) {
       updatedProfile = await TeacherProfile.findOneAndUpdate(
         { user: userId },
         { $set: parsedProfileData },
-        { new: true, runValidators: true },
+        { new: true, runValidators: true }
       ).populate("department", "name");
     } else {
-      // যদি আলাদা প্রোফাইল ডাটা পাস না করা হয়, ডাটাবেজ থেকে এক্সিস্টিং ডাটা রিড করা হবে
       updatedProfile =
         user.role === "teacher"
           ? await TeacherProfile.findOne({ user: userId }).populate(
               "department",
-              "name",
+              "name"
             )
           : await StudentProfile.findOne({ user: userId }).populate(
               "department",
-              "name",
+              "name"
             );
     }
 
     res.status(200).json({
-      message: "প্রোফাইল সফলভাবে আপডেট হয়েছে",
+      message: "Profile updated successfully",
       user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        gender: user.gender,
-        profileImage: user.profileImage,
-        birthDate: user.birthDate,
-        division: user.division,
-        presentDivision: user.presentDivision,
-        district: user.district,
-        permanentAddress: user.permanentAddress,
-        role: user.role,
+        ...user._doc,
+        password: (fill = undefined),
         profile: updatedProfile,
       },
     });
@@ -194,7 +198,6 @@ const updateProfile = async (req, res) => {
   }
 };
 
-// 🎯 নতুন সিকিউর এপিআই: চেঞ্জ পাসওয়ার্ড (Change Password with Verification)
 const changePassword = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -203,27 +206,23 @@ const changePassword = async (req, res) => {
     if (!oldPassword || !newPassword) {
       return res
         .status(400)
-        .json({ message: "বর্তমান এবং নতুন পাসওয়ার্ড উভয়ই প্রদান করুন" });
+        .json({ message: "Provide both current and new password" });
     }
 
-    // ডাটাবেজ থেকে ম্যাচপাসওয়ার্ড মেথড ব্যবহারের সুবিধার্থে ইউজার অবজেক্ট রিড
     const user = await User.findById(userId);
     if (!user)
-      return res.status(404).json({ message: "ব্যবহারকারী পাওয়া যায়নি" });
+      return res.status(404).json({ message: "User not found" });
 
-    // ১. ওল্ড পাসওয়ার্ড ভ্যালিডেশন চেক
     const isMatch = await user.matchPassword(oldPassword);
-    if (!isMatch) {
+    if (!isMatch)
       return res
         .status(401)
-        .json({ message: "আপনার বর্তমান পাসওয়ার্ডটি সঠিক নয়" });
-    }
+        .json({ message: "Current password is incorrect" });
 
-    // ২. নতুন পাসওয়ার্ড সেট করা (User Model pre-save হুক এটিকে অটোমেটিক সল্ট হ্যাশ করে দেবে)
     user.password = newPassword;
     await user.save();
 
-    res.status(200).json({ message: "পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে" });
+    res.status(200).json({ message: "Password changed successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -232,9 +231,7 @@ const changePassword = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const userId = req.user._id;
-
     const user = await User.findById(userId).select("-password").lean();
-
     if (!user) return res.status(404).json({ message: "User not found" });
 
     let profileData = null;
@@ -245,17 +242,16 @@ const getMe = async (req, res) => {
         .populate("department", "name")
         .lean();
     } else if (user.role === "student") {
+      // Get student profile and feeds
       const [studentProfile, noticesFeed, classLinksFeed] = await Promise.all([
         StudentProfile.findOne({ user: userId })
           .populate("department", "name")
           .lean(),
-
         TeacherNotice.find({})
           .populate("course", "name category banner")
           .populate("instructor", "name profilePicture")
           .sort({ pinned: -1, createdAt: -1 })
           .lean(),
-
         ClassLink.find({})
           .populate("course", "title category image")
           .populate("instructor", "name profilePicture")
@@ -297,8 +293,16 @@ const googleLogin = async (req, res) => {
         role: "student",
       });
 
+      // Create new student ID for google login user
+      const currentYear = new Date().getFullYear();
+      const totalStudentsWithId = await StudentProfile.countDocuments({
+        studentId: { $ne: null },
+      });
+      const nextSequence = String(totalStudentsWithId + 1).padStart(4, "0");
+
       await StudentProfile.create({
         user: user._id,
+        studentId: `DIS-${currentYear}-${nextSequence}`,
         studentNameBn: "",
       });
     }
@@ -307,12 +311,12 @@ const googleLogin = async (req, res) => {
     if (user.role === "student") {
       profileData = await StudentProfile.findOne({ user: user._id }).populate(
         "department",
-        "name",
+        "name"
       );
     } else if (user.role === "teacher") {
       profileData = await TeacherProfile.findOne({ user: user._id }).populate(
         "department",
-        "name",
+        "name"
       );
     }
 

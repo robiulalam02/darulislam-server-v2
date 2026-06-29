@@ -77,7 +77,7 @@ const getAdminDashboardOverview = async (req, res) => {
     let recentOrdersList = [];
     let allEnrollmentsForTopCourses = [];
 
-    // 🎯 ক্যোয়েরি ১: ইউজার কাউন্ট
+    // User count
     try {
       totalStudentsCount = await User.countDocuments({ role: "student" });
     } catch (e) {
@@ -86,7 +86,7 @@ const getAdminDashboardOverview = async (req, res) => {
         .json({ success: false, message: "User Count Error: " + e.message });
     }
 
-    // 🎯 ক্যোয়েরি ২: একটিভ কোর্স কাউন্ট
+    // Active course count
     try {
       activeCoursesCount = await Course.countDocuments({ isPublished: true });
     } catch (e) {
@@ -95,7 +95,7 @@ const getAdminDashboardOverview = async (req, res) => {
         .json({ success: false, message: "Course Count Error: " + e.message });
     }
 
-    // 🎯 ক্যোয়েরি ৩: এনরোলমেন্ট ডাটা ফেচ (ক্র্যাশ এড়াতে লিনিয়ার পপআপ ও লীন মেথড)
+    // Enrollment info
     try {
       pendingEnrollmentsCount = await Enrollment.countDocuments({
         status: "pending",
@@ -123,7 +123,7 @@ const getAdminDashboardOverview = async (req, res) => {
         });
     }
 
-    // 🎯 ক্যোয়েরি ৪: অর্ডার ট্রানজেকশন ট্র্যাকার
+    // Order info
     try {
       allDeliveredOrders = await Order.find({ orderStatus: "delivered" })
         .select("totalAmount createdAt")
@@ -141,7 +141,7 @@ const getAdminDashboardOverview = async (req, res) => {
         });
     }
 
-    // --- রেভিনিউ ক্যালকুলেশন মেকানিজম ---
+    // Revenue calculation
     const enrollmentRevenue = allApprovedEnrollments.reduce((sum, item) => {
       return sum + (Number(item?.paymentDetails?.amountPaid) || 0);
     }, 0);
@@ -152,21 +152,18 @@ const getAdminDashboardOverview = async (req, res) => {
 
     const totalGrossRevenue = enrollmentRevenue + shopRevenue;
 
-    // 🎯 পাই চার্ট ক্যাটাগরি প্রসেসিং (real-time dynamic alignment tracking)
+    // Pie chart: category breakdown
     const categoryMap = {};
     let totalAssignedCategoryItems = 0;
 
     allApprovedEnrollments.forEach((enroll) => {
       if (enroll?.course) {
-        let catName = "জেনারেল (General)";
-
-        // যদি কোর্সটি একাডেমিক ক্যাটাগরির হয়
+        let catName = "General";
         if (enroll.course.courseCategoryType === "academic") {
-          catName = "একাডেমিক (Academic)";
+          catName = "Academic";
         } else if (enroll.course.courseCategoryType === "general") {
-          catName = "জেনারেল (General)";
+          catName = "General";
         }
-
         categoryMap[catName] = (categoryMap[catName] || 0) + 1;
         totalAssignedCategoryItems++;
       }
@@ -194,7 +191,7 @@ const getAdminDashboardOverview = async (req, res) => {
       ];
     }
 
-    // --- টাইমলাইন চার্ট জেনারেটর ---
+    // Timeline chart: income per month
     const monthNames = [
       "Jan",
       "Feb",
@@ -236,7 +233,7 @@ const getAdminDashboardOverview = async (req, res) => {
       }
     });
 
-    // --- টপ কোর্স ট্র্যাকিং ---
+    // Top courses (by enrollments)
     const topCoursesMap = {};
     allEnrollmentsForTopCourses.forEach((enroll) => {
       if (enroll?.course) {
@@ -280,7 +277,7 @@ const getAdminDashboardOverview = async (req, res) => {
       };
     });
 
-    // --- রিসেন্ট অর্ডার ট্র্যাকিং ---
+    // Recent orders
     const structuredRecentOrders = recentOrdersList.map((ord) => {
       const initials = ord.customerDetails?.name
         ? ord.customerDetails.name
@@ -308,7 +305,7 @@ const getAdminDashboardOverview = async (req, res) => {
       };
     });
 
-    // ফাইনাল লাইভ সাকসেস রেসপন্স অবজেক্ট পাসিং
+    // Final response
     res.status(200).json({
       success: true,
       data: {
@@ -333,7 +330,6 @@ const getAdminDashboardOverview = async (req, res) => {
     });
   }
 };
-
 
 module.exports = {
   createAdminNotice,

@@ -10,7 +10,7 @@ const {
   getStudentResults,
 } = require("../controllers/assignmentController");
 const { protect, instructor } = require("../middlewares/authMiddleware");
-const upload = require("../middlewares/uploadMiddleware"); // Assuming multi-file image uploader is ready
+const upload = require("../middlewares/uploadMiddleware");
 
 // Instructor Management Nodes
 router.post("/teacher/create", protect, instructor, createAssignment);

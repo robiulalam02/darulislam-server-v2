@@ -21,30 +21,27 @@ const getAllUsers = async (req, res) => {
       ];
     }
 
-    // 1. Fetch core users matching primary user credentials
     let users = await User.find(query)
       .select("-password")
       .sort({ createdAt: -1 });
 
     const userIds = users.map((user) => user._id);
 
-    // 2. Handle filtering when role is teacher
     if (role === "teacher") {
       let profileFilter = { user: { $in: userIds } };
 
-      // Apply status parameter filter securely
       if (status === "pending") {
         profileFilter.isApproved = false;
       } else if (status === "approved") {
         profileFilter.isApproved = true;
       }
 
-      // Apply department ObjectID match
-      if (department) {
-        profileFilter.department = department;
+      if (department) profileFilter.department = department;
+
+      if (search) {
+        profileFilter.$or = [{ teacherId: { $regex: search, $options: "i" } }];
       }
 
-      // Apply regex filtering for localized experience formats
       if (experience) {
         profileFilter.experience = { $regex: experience, $options: "i" };
       }
@@ -54,7 +51,6 @@ const getAllUsers = async (req, res) => {
         "name",
       );
 
-      // Merge results and discard users whose profiles didn't match the criteria
       users = users
         .map((user) => {
           const profile = profiles.find(
@@ -64,15 +60,33 @@ const getAllUsers = async (req, res) => {
         })
         .filter((user) => user !== null);
     } else if (role === "student") {
-      // Handle fallback filtering mapping for student arrays if necessary
-      const profiles = await StudentProfile.find({ user: { $in: userIds } });
+      let studentProfileFilter = { user: { $in: userIds } };
 
-      users = users.map((user) => {
-        const profile = profiles.find(
-          (p) => p.user.toString() === user._id.toString(),
-        );
-        return { ...user._doc, profileData: profile || null };
-      });
+      if (status === "pending") {
+        studentProfileFilter.isApproved = false;
+      } else if (status === "approved") {
+        studentProfileFilter.isApproved = true;
+      }
+
+      if (search) {
+        studentProfileFilter.$or = [
+          { studentId: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      const profiles = await StudentProfile.find(studentProfileFilter).populate(
+        "department",
+        "name",
+      );
+
+      users = users
+        .map((user) => {
+          const profile = profiles.find(
+            (p) => p.user.toString() === user._id.toString(),
+          );
+          return profile ? { ...user._doc, profileData: profile } : null;
+        })
+        .filter((user) => user !== null);
     }
 
     res.status(200).json({
@@ -101,7 +115,10 @@ const getUserById = async (req, res) => {
         "name",
       );
     } else if (user.role === "student") {
-      profileData = await StudentProfile.findOne({ user: user._id });
+      profileData = await StudentProfile.findOne({ user: user._id }).populate(
+        "department",
+        "name",
+      );
     }
 
     res.status(200).json({
@@ -128,7 +145,6 @@ const adminUpdateUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // 1. Update core credentials data
     if (name) user.name = name;
     if (email) user.email = email;
     if (role) user.role = role;
@@ -138,7 +154,6 @@ const adminUpdateUser = async (req, res) => {
     }
     await user.save();
 
-    // 2. Parse stringified nested profile payload from FormData execution
     if (profileData && typeof profileData === "string") {
       try {
         profileData = JSON.parse(profileData);
@@ -149,7 +164,6 @@ const adminUpdateUser = async (req, res) => {
       }
     }
 
-    // 3. Update correlated profile layouts cleanly based on active roles
     if (user.role === "teacher" && profileData) {
       await TeacherProfile.findOneAndUpdate(
         { user: userId },
@@ -167,33 +181,26 @@ const adminUpdateUser = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "User and profile datasets updated successfully",
-      image: user.image,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Delete User and clear related profiles safely
+// Delete User
 const adminDeleteUser = async (req, res) => {
   try {
     const userId = req.params.id;
-
     const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Remove associated child structures to prevent dead data references
     if (user.role === "teacher") {
       await TeacherProfile.deleteOne({ user: userId });
     } else if (user.role === "student") {
       await StudentProfile.deleteOne({ user: userId });
     }
 
-    // Remove primary authentication key document
     await user.deleteOne();
-
     res.status(200).json({
       success: true,
       message: "User and corresponding profile data permanently removed",
@@ -203,6 +210,7 @@ const adminDeleteUser = async (req, res) => {
   }
 };
 
+// Teachers Approval & Unique ID Generation
 const approveTeacher = async (req, res) => {
   try {
     const { isApproved } = req.body;
@@ -213,19 +221,68 @@ const approveTeacher = async (req, res) => {
       return res.status(404).json({ message: "Teacher profile not found" });
     }
 
+    if (isApproved && !profile.teacherId) {
+      const currentYear = new Date().getFullYear();
+      const totalTeachersWithId = await TeacherProfile.countDocuments({
+        teacherId: { $ne: null },
+      });
+
+      const nextSequence = String(totalTeachersWithId + 1).padStart(3, "0");
+      profile.teacherId = `DIT-${currentYear}-${nextSequence}`;
+    }
+
     profile.isApproved = isApproved;
     await profile.save();
 
     res.status(200).json({
       success: true,
-      message: `Teacher ${isApproved ? "approved" : "disapproved"} successfully`,
+      message: `Teacher ${isApproved ? "approved with Custom ID" : "disapproved"} successfully`,
       isApproved: profile.isApproved,
+      teacherId: profile.teacherId || null,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
+// Students Approval & Student Unique ID Generation
+const approveStudent = async (req, res) => {
+  try {
+    const { isApproved } = req.body;
+    const userId = req.params.id;
+
+    const profile = await StudentProfile.findOne({ user: userId });
+    if (!profile) {
+      return res.status(404).json({ message: "Student profile not found" });
+    }
+
+    // If Admin approved but no ID generated
+    if (isApproved && !profile.studentId) {
+      const currentYear = new Date().getFullYear();
+      const totalStudentsWithId = await StudentProfile.countDocuments({
+        studentId: { $ne: null },
+      });
+
+      // DIS-2026-0001
+      const nextSequence = String(totalStudentsWithId + 1).padStart(4, "0");
+      profile.studentId = `DIS-${currentYear}-${nextSequence}`;
+    }
+
+    profile.isApproved = isApproved;
+    await profile.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Student ${isApproved ? "approved with Custom ID" : "disapproved"} successfully`,
+      isApproved: profile.isApproved,
+      studentId: profile.studentId || null,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Role Update Route Trigger Engine (No direct ID creation anymore)
 const updateUserRole = async (req, res) => {
   try {
     const { role } = req.body;
@@ -254,7 +311,10 @@ const updateUserRole = async (req, res) => {
     } else if (role === "student") {
       const existingProfile = await StudentProfile.findOne({ user: userId });
       if (!existingProfile) {
-        await StudentProfile.create({ user: userId });
+        await StudentProfile.create({
+          user: userId,
+          isApproved: false, // default: pending
+        });
       }
     }
 
@@ -268,32 +328,26 @@ const updateUserRole = async (req, res) => {
   }
 };
 
-// ==========================================
-// Teacher - My Students Controller (Advanced Server-Side Filtering)
-// ==========================================
+// Teacher - My Students Controller
 const getTeacherStudents = async (req, res) => {
   try {
     const teacherId = req.user._id;
-    const { courseId, courseCategoryType, search } = req.query; // 🎯 সার্ভার সাইড কুয়েরি ডিক্লেয়ারেশন
+    const { courseId, courseCategoryType, search } = req.query;
 
-    // ১. প্রথমে এই শিক্ষকের অধীনে থাকা সমস্ত কোর্স খুঁজে বের করা হলো
     const teacherCourses = await Course.find({ instructor: teacherId }).select(
       "_id",
     );
     const allCourseIds = teacherCourses.map((course) => course._id);
 
-    // ২. মেইন কুয়েরি অবজেক্ট আর্কিটেকচার
     let queryConditions = {
       course: { $in: allCourseIds },
       status: "approved",
     };
 
-    // নির্দিষ্ট কোর্স ফিল্টার (যদি শিক্ষক ড্রপডাউন থেকে সিলেক্ট করেন)
     if (courseId) {
       queryConditions.course = courseId;
     }
 
-    // ৩. শিক্ষার্থী পপুলেশন ও মেলাবার জন্য মঙ্গুজ এগ্রিগেশন পাইপলাইন অথবা ডাইনামিক পপুলেশন ম্যাচ মেকানিজম
     let populateStudentOptions = {
       path: "student",
       select: "name email phone profileImage gender",
@@ -303,23 +357,32 @@ const getTeacherStudents = async (req, res) => {
       select: "title courseCategoryType image price",
     };
 
-    // যদি কোর্স টাইপ (academic/general) ফিল্টার থাকে
     if (courseCategoryType) {
       populateCourseOptions.match = { courseCategoryType };
     }
 
-    // ৪. ডাটাবেজ কোয়েরি ট্রিগার
     const enrollments = await Enrollment.find(queryConditions)
       .populate(populateStudentOptions)
       .populate(populateCourseOptions)
       .sort({ createdAt: -1 })
       .lean();
 
-    // ৫. সার্ভার-সাইড অ্যাডভান্সড ফিল্টারিং ও গ্লোবাল সার্চ সিঙ্ক
+    const studentUserIds = enrollments
+      .map((e) => e.student?._id)
+      .filter(Boolean);
+    const studentProfiles = await StudentProfile.find({
+      user: { $in: studentUserIds },
+    })
+      .select("user studentId")
+      .lean();
+
     let structuredStudents = enrollments
       .map((enroll) => {
-        // যদি কোর্স ফিল্টারের সাথে টাইপ না মেলে বা স্টুডেন্ট না থাকে, তবে স্কিপ করবে
         if (!enroll.student || !enroll.course) return null;
+
+        const matchedProfile = studentProfiles.find(
+          (p) => p.user.toString() === enroll.student._id.toString(),
+        );
 
         return {
           _id: enroll.student._id,
@@ -328,6 +391,7 @@ const getTeacherStudents = async (req, res) => {
           phone: enroll.student.phone,
           profileImage: enroll.student.profileImage,
           gender: enroll.student.gender,
+          studentId: matchedProfile ? matchedProfile.studentId : null,
           role: "student",
           enrolledCourse: {
             _id: enroll.course._id,
@@ -340,14 +404,14 @@ const getTeacherStudents = async (req, res) => {
       })
       .filter(Boolean);
 
-    // 🔍 গ্লোবাল সার্চ কুয়েরি ম্যাচিং (নাম, ইমেইল, ফোন নম্বর)
     if (search && search.trim() !== "") {
       const searchRegex = new RegExp(search.trim(), "i");
       structuredStudents = structuredStudents.filter(
         (student) =>
           searchRegex.test(student.name) ||
           searchRegex.test(student.email) ||
-          searchRegex.test(student.phone),
+          searchRegex.test(student.phone) ||
+          (student.studentId && searchRegex.test(student.studentId)),
       );
     }
 
@@ -368,5 +432,6 @@ module.exports = {
   adminDeleteUser,
   updateUserRole,
   approveTeacher,
+  approveStudent,
   getTeacherStudents,
 };

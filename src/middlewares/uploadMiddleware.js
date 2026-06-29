@@ -10,13 +10,35 @@ cloudinary.config({
 
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: "user_profiles",
-    resource_type: "auto",
-    allowed_formats: ["jpeg", "png", "jpg", "webp", "mp3", "wav"],
+  params: async (req, file) => {
+    // Audio File Configurations
+    if (file.mimetype.startsWith("audio/")) {
+      return {
+        folder: "darulislam_audios",
+        resource_type: "auto",
+        allowed_formats: ["mp3", "wav"],
+      };
+    }
+
+    // Image Optimization
+    return {
+      folder: "user_profiles",
+      resource_type: "image",
+      format: "webp",
+      transformation: [
+        { width: 1000, height: 1000, crop: "limit" },
+        { quality: "auto:good" },
+        { fetch_format: "webp" },
+      ],
+    };
   },
 });
 
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // Max 10 MB File
+  },
+});
 
 module.exports = upload;
